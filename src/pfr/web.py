@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import traceback
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -96,8 +97,23 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
             })
         except Exception as exc:  # noqa: BLE001 - validation errors must reach the user
             logger.exception("Falha na execução web %s", run_id)
-            shutil.rmtree(run_root, ignore_errors=True)
-            return jsonify({"error": str(exc), "run_id": run_id, "files": saved_files}), 400
+            log_path = run_root / f"erro_{run_id}.txt"
+            log_path.write_text(
+                "PFR - LOG DE ERRO\n"
+                f"Execução: {run_id}\n"
+                f"Data UTC: {datetime.now(timezone.utc).isoformat()}\n"
+                f"Arquivos recebidos: {', '.join(saved_files) or '-'}\n\n"
+                f"Erro: {exc}\n\n"
+                "Rastreamento técnico:\n"
+                f"{traceback.format_exc()}",
+                encoding="utf-8",
+            )
+            return jsonify({
+                "error": str(exc),
+                "run_id": run_id,
+                "files": saved_files,
+                "log_url": f"/api/log/{run_id}/{log_path.name}",
+            }), 400
 
     @app.get("/api/download/<run_id>/<filename>")
     def download(run_id: str, filename: str):
@@ -108,6 +124,16 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
         if root not in target.parents or not target.is_file():
             return jsonify({"error": "Arquivo não encontrado."}), 404
         return send_file(target, as_attachment=True, download_name=target.name)
+
+    @app.get("/api/log/<run_id>/<filename>")
+    def download_log(run_id: str, filename: str):
+        safe_run_id = secure_filename(run_id)
+        safe_filename = secure_filename(filename)
+        root = (app.config["RUN_ROOT"] / safe_run_id).resolve()
+        target = (root / safe_filename).resolve()
+        if root not in target.parents or target.suffix.lower() != ".txt" or not target.is_file():
+            return jsonify({"error": "Log não encontrado."}), 404
+        return send_file(target, as_attachment=True, download_name=target.name, mimetype="text/plain")
 
     return app
 

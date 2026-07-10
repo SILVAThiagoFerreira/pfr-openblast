@@ -58,3 +58,22 @@ class WebTest(unittest.TestCase):
             response = create_app(root, config).test_client().get("/api/health")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.get_json()["status"], "ok")
+
+    def test_generation_error_keeps_txt_log_available(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root / "config.yaml"
+            config.write_text("paths: {}\n", encoding="utf-8")
+            app = create_app(root, config)
+            with patch("pfr.web.run", side_effect=ValueError("falha de validação")):
+                response = app.test_client().post(
+                    "/api/generate",
+                    data={"inputs": (io.BytesIO(b"a"), "input.csv")},
+                    content_type="multipart/form-data",
+                )
+            self.assertEqual(response.status_code, 400)
+            payload = response.get_json()
+            log_response = app.test_client().get(payload["log_url"])
+            self.assertEqual(log_response.status_code, 200)
+            self.assertIn("falha de validação", log_response.data.decode("utf-8"))
+            log_response.close()
