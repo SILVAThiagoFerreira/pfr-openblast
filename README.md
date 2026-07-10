@@ -42,6 +42,8 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 
 - Limite de 250 MB por requisição e até 20 arquivos por execução.
 - Arquivos com nomes repetidos são recusados para evitar sobrescrita silenciosa.
+- As tabelas são identificadas pelas colunas obrigatórias, portanto o usuário pode renomear os arquivos sem quebrar a operação.
+- O HISTO é identificado pelo nome ou pela presença de eventos `[Fire]`; o PDF é validado pelo cabeçalho `%PDF-` antes do processamento.
 - Execuções temporárias com mais de 24 horas são removidas automaticamente.
 - Falhas de identificação do plano ou do evento `[Fire]` interrompem a execução; o sistema não usa a data/hora atual como substituição.
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.

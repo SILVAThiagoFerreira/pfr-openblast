@@ -16,10 +16,19 @@ const ALIASES = {
   'Angle (°)': 'Angle_deg', 'Azimuth (º)': 'Azimuth_deg', 'Azimuth (°)': 'Azimuth_deg',
   'Total_Charge (Kg)': 'Total_Charge_kg'
 };
-const BUSINESS = { type: 'producao', fillMissingTime: true, stemmingVariation: true, stemmingMaxDelta: 0.12, redistributeZeroCharges: true, chargeTarget: 17136.048, zeroChargeMinimum: 0.01 };
+const BUSINESS = {
+  type: 'producao', fillMissingTime: true, stemmingVariation: true, stemmingMaxDelta: 0.12,
+  redistributeZeroCharges: true, chargeTarget: 17136.048, zeroChargeMinimum: 0.01,
+  ...(window.PFR_BROWSER_CONFIG?.business || {})
+};
 
 document.querySelector('#year').textContent = new Date().getFullYear();
-statusText.textContent = 'Processamento local · sem API ou IA';
+if (typeof XLSX === 'undefined') {
+  statusText.textContent = 'Biblioteca Excel indisponível · recarregue a página';
+  statusBox.classList.add('offline');
+} else {
+  statusText.textContent = 'Processamento local · sem API ou IA';
+}
 
 function renderFiles(files) {
   list.replaceChildren();
@@ -76,6 +85,12 @@ async function readTable(file) {
   return normalizeRows(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
 }
 
+function hasColumns(rows, columns) {
+  if (!rows.length) return false;
+  const available = new Set(rows.flatMap(row => Object.keys(row)));
+  return columns.every(column => available.has(column));
+}
+
 function requireColumns(rows, columns, label) {
   const available = new Set(rows.flatMap(row => Object.keys(row)));
   const missing = columns.filter(column => !available.has(column));
@@ -83,24 +98,36 @@ function requireColumns(rows, columns, label) {
   if (missing.length) throw new Error(`${label}: colunas obrigatórias ausentes: ${missing.join(', ')}.`);
 }
 
-function findFile(files, predicate, label) {
-  const file = files.find(predicate);
-  if (!file) throw new Error(`Arquivo obrigatório não encontrado: ${label}.`);
-  return file;
+function decodeText(bytes) {
+  const utf8 = new TextDecoder('utf-8').decode(bytes);
+  return utf8.includes('\uFFFD') ? new TextDecoder('windows-1252').decode(bytes) : utf8;
 }
 
-function findSources(files) {
+async function findSources(files) {
   const tables = files.filter(file => /\.(csv|xlsx|xlsm)$/i.test(file.name));
-  const project = tables.find(file => /projeto\s*completo/i.test(file.name));
-  const final = tables.find(file => /config\s*final/i.test(file.name));
-  const histo = files.find(file => /^HISTO-.*\.txt$/i.test(file.name)) || files.find(file => /histo/i.test(file.name) && /\.txt$/i.test(file.name));
-  const pdf = files.find(file => /\.pdf$/i.test(file.name));
-  if (!project || !final) {
-    throw new Error('Envie os dois arquivos de tabela: projeto completo e config final.');
+  const parsedTables = await Promise.all(tables.map(async file => {
+    try { return { file, rows: await readTable(file) }; } catch (error) { return { file, rows: [], error }; }
+  }));
+  const namedProject = parsedTables.find(item => /projeto\s*completo/i.test(item.file.name) && hasColumns(item.rows, REQUIRED_PROJECT));
+  const namedFinal = parsedTables.find(item => /config\s*final/i.test(item.file.name) && hasColumns(item.rows, REQUIRED_FINAL));
+  const projectEntry = namedProject || parsedTables.find(item => hasColumns(item.rows, REQUIRED_PROJECT));
+  const finalEntry = namedFinal || parsedTables.find(item => hasColumns(item.rows, REQUIRED_FINAL));
+  if (projectEntry && finalEntry && projectEntry.file.name === finalEntry.file.name) {
+    throw new Error('Os arquivos de projeto e realizado precisam ser tabelas diferentes.');
   }
+  const textFiles = files.filter(file => /\.txt$/i.test(file.name));
+  const textCandidates = await Promise.all(textFiles.map(async file => ({ file, text: decodeText(new Uint8Array(await file.arrayBuffer())) })));
+  const histoEntry = textCandidates.find(item => /^HISTO-.*\.txt$/i.test(item.file.name))
+    || textCandidates.find(item => /histo/i.test(item.file.name))
+    || textCandidates.find(item => /\[Fire\]\d{4}\/\d{2}\/\d{2}-\d{2}:\d{2}:\d{2}/.test(item.text));
+  const histo = histoEntry?.file;
+  const pdf = files.find(file => /\.pdf$/i.test(file.name));
+  if (!projectEntry || !finalEntry) throw new Error('Não foi possível identificar as tabelas. Confira se uma contém as colunas do projeto e outra as colunas do realizado.');
   if (!histo) throw new Error('Envie o arquivo HISTO-*.txt.');
   if (!pdf) throw new Error('Envie o PP.pdf.');
-  return { project, final, histo, pdf };
+  const pdfHeader = decodeText(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
+  if (!pdfHeader.startsWith('%PDF-')) throw new Error(`O arquivo ${pdf.name} não parece ser um PDF válido.`);
+  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry.text, pdf };
 }
 
 function formatDate(date) {
@@ -111,18 +138,20 @@ function formatDate(date) {
 function extractPlanAndFire(text) {
   const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
   const events = [...text.matchAll(eventRegex)];
-  const plans = [...text.matchAll(/\bPP(\d{6})\b/gi)].map(match => match[1]);
-  const planId = [...new Set(plans)].pop();
-  if (!planId) throw new Error('Não foi possível identificar o plano no HISTO.');
   for (let index = 0; index < events.length; index += 1) {
     const event = events[index];
     if (event[1] !== 'BlastingPlan') continue;
     const end = index + 1 < events.length ? events[index + 1].index : text.length;
     const block = text.slice(event.index, end);
-    if (!new RegExp(`\\bPP?0*${planId.replace(/^0+/, '')}\\b`, 'i').test(block)) continue;
+    const blockPlans = [...block.matchAll(/\bPP(\d{6})\b/gi)].map(match => match[1]);
+    const planId = blockPlans[blockPlans.length - 1];
+    if (!planId) continue;
     const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
     if (fire) return { planId, date: formatDate(fire[2]), time: fire[3] };
   }
+  const plans = [...text.matchAll(/\bPP(\d{6})\b/gi)].map(match => match[1]);
+  const planId = [...new Set(plans)].pop();
+  if (!planId) throw new Error('Não foi possível identificar o plano no HISTO.');
   const fires = events.filter(event => event[1] === 'Fire');
   if (!fires.length) throw new Error('Não foi encontrado nenhum evento [Fire] válido no HISTO.');
   const fire = fires[fires.length - 1];
@@ -170,7 +199,12 @@ function fillMissingTimes(values) {
   return { values: result.map(value => value === null ? null : Math.round(value)), imputed };
 }
 
-async function sha256(bytes) { return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)); }
+async function sha256(bytes) {
+  if (globalThis.crypto?.subtle) return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  let hash = 2166136261;
+  for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619);
+  return new Uint8Array([hash >>> 24, hash >>> 16, hash >>> 8, hash, hash >>> 16, hash >>> 8, hash >>> 24, hash]);
+}
 
 async function applyStemmingVariation(values, numbers, planId) {
   if (!BUSINESS.stemmingVariation) return values;
@@ -247,8 +281,13 @@ function buildWorkbook(data, sources, event) {
 
 async function generateLocally(files) {
   if (typeof XLSX === 'undefined') throw new Error('A biblioteca local de Excel não carregou. Recarregue a página e tente novamente.');
-  const sources = findSources(files);
-  const [projectRows, finalRows, histoText] = await Promise.all([readTable(sources.project), readTable(sources.final), sources.histo.text()]);
+  if (files.length > 20) throw new Error('Envie no máximo 20 arquivos por execução.');
+  const totalBytes = files.reduce((total, file) => total + file.size, 0);
+  if (totalBytes > 250 * 1024 * 1024) throw new Error('Os anexos excedem o limite total de 250 MB.');
+  const names = files.map(file => file.name.trim().toLocaleLowerCase());
+  if (new Set(names).size !== names.length) throw new Error('Há arquivos com nomes repetidos no envio. Renomeie-os antes de tentar novamente.');
+  const sources = await findSources(files);
+  const { projectRows, finalRows, histoText } = sources;
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
   const event = extractPlanAndFire(histoText);
