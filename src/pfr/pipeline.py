@@ -45,7 +45,11 @@ def run(config_path: Path) -> RunResult:
     backup_inputs([sources.project, sources.final, sources.plan_pdf, *sources.histo_files], cfg["paths"]["backup_root"])
 
     plan_id = extract_plan_id(sources.plan_pdf, sources.histo_files, cfg)
-    blast_date, blast_time = extract_blast_datetime(sources.histo_files, plan_id)
+    blast_date, blast_time = extract_blast_datetime(
+        sources.histo_files,
+        plan_id,
+        allow_unmatched_plan_fallback=cfg["business"].get("allow_unmatched_plan_fire_fallback", False),
+    )
 
     project = load_project_frame(sources.project)
     final = load_final_frame(sources.final)

@@ -5,6 +5,7 @@ import os
 import shutil
 import uuid
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -16,6 +17,7 @@ from .pipeline import run
 
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xlsm", ".pdf", ".txt"}
 MAX_FILE_SIZE = 250 * 1024 * 1024
+MAX_FILES_PER_RUN = 20
 
 
 def create_app(project_root: Path, default_config: Path) -> Flask:
@@ -31,6 +33,10 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
         return response
+
+    @app.errorhandler(413)
+    def request_too_large(_error):
+        return jsonify({"error": "Os anexos excedem o limite total de 250 MB."}), 413
 
     @app.get("/")
     def index():
@@ -49,6 +55,10 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
         files = [item for item in request.files.getlist("inputs") if item and item.filename]
         if not files:
             return jsonify({"error": "Anexe os arquivos de projeto, config final, PP e HISTO."}), 400
+        if len(files) > MAX_FILES_PER_RUN:
+            return jsonify({"error": f"Envie no máximo {MAX_FILES_PER_RUN} arquivos por execução."}), 400
+
+        _cleanup_expired_runs(app.config["RUN_ROOT"])
 
         run_id = uuid.uuid4().hex[:12]
         run_root = app.config["RUN_ROOT"] / run_id
@@ -58,10 +68,15 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
         output_root.mkdir(parents=True, exist_ok=True)
         saved_files = []
         try:
+            seen_names: set[str] = set()
             for upload in files:
                 filename = _safe_filename(upload.filename)
                 if not filename or Path(filename).suffix.lower() not in ALLOWED_EXTENSIONS:
                     raise ValueError(f"Extensão não permitida: {filename or upload.filename}")
+                normalized = filename.casefold()
+                if normalized in seen_names:
+                    raise ValueError(f"Arquivo duplicado no envio: {filename}")
+                seen_names.add(normalized)
                 upload.save(input_root / filename)
                 saved_files.append(filename)
 
@@ -99,6 +114,19 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
 
 def _safe_filename(filename: str) -> str:
     return Path(filename.replace("\\", "/")).name.strip()
+
+
+def _cleanup_expired_runs(run_root: Path) -> None:
+    if not run_root.exists():
+        return
+    age_hours = float(os.environ.get("PFR_RUN_RETENTION_HOURS", "24"))
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=age_hours)
+    for child in run_root.iterdir():
+        if not child.is_dir():
+            continue
+        modified = datetime.fromtimestamp(child.stat().st_mtime, timezone.utc)
+        if modified < cutoff:
+            shutil.rmtree(child, ignore_errors=True)
 
 
 def _build_run_config(default_config: Path, project_root: Path, input_root: Path, output_root: Path, run_root: Path) -> Path:

@@ -39,6 +39,21 @@ DBD0233;94
         self.assertEqual(blast_date, "19/06/2026")
         self.assertEqual(blast_time, "12:10:52")
 
+    def test_fallback_plan_id_is_not_extracted_from_pdf(self):
+        cfg = normalize_config(load_config(ROOT / "config.yaml"), ROOT)
+        with TemporaryDirectory() as tmp:
+            pdf = Path(tmp) / "PP.pdf"
+            pdf.write_bytes(b"not a real pdf")
+            self.assertEqual(extract_plan_id(None, (), cfg), "320526")
+
+    def test_missing_plan_fire_event_fails_instead_of_using_current_time(self):
+        history = "[BlastingPlan]2026/05/13-11:50:28;84;+37.0\nPP999999\n"
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "HISTO.txt"
+            path.write_text(history, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "(?i)não foi encontrado.*plano"):
+                extract_blast_datetime((path,), "320526")
+
     def test_blast_datetime_is_tied_to_plan_block(self):
         history = """[BlastingPlan]2026/05/13-06:05:55;88;+26.1
 DBD0061;99

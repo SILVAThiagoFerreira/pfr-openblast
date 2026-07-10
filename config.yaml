@@ -27,6 +27,7 @@ business:
   plan_id_source: "fallback"
   plan_id_regex: "^NAO_EXTRAIR_ID_DO_ARQUIVO$"
   fallback_plan_id: "320526"
+  allow_unmatched_plan_fire_fallback: true
   redistribute_zero_charges: true
   charge_total_target_kg: 17136.048
   charge_zero_fill_min_kg: 0.01

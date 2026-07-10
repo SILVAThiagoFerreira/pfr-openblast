@@ -37,6 +37,15 @@ O projeto tem duas camadas publicadas a partir do mesmo repositório:
 
 O arquivo `public/config.js` aponta a interface para a API pública. Para uma instalação em outro domínio, altere apenas `window.PFR_API_BASE`. O processamento nunca depende de arquivos do computador do usuário: os anexos são enviados para a execução temporária do backend e descartados quando há falha.
 
+### Proteções da interface online
+
+- Limite de 250 MB por requisição e até 20 arquivos por execução.
+- Arquivos com nomes repetidos são recusados para evitar sobrescrita silenciosa.
+- Execuções temporárias com mais de 24 horas são removidas automaticamente.
+- Falhas de identificação do plano ou do evento `[Fire]` interrompem a execução; o sistema não usa a data/hora atual como substituição.
+- `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
+- Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
+
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. A data/hora do disparo e extraida do `HISTO-*.txt` pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` que contem esse plano. Quando o PDF trouxer o plano com zero à esquerda e o `HISTO` registrar a mesma frente sem esse zero, o sistema trata as duas formas como equivalentes.
 

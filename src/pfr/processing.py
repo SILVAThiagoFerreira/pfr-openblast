@@ -328,6 +328,13 @@ def _enforce_charge_total_target(
 
 
 def extract_plan_id(plan_pdf: Path | None, histo_files: tuple[Path, ...], cfg: dict) -> str:
+    business = cfg.get("business", {})
+    source = str(business.get("plan_id_source", "auto")).strip().lower()
+    fallback = str(business.get("fallback_plan_id", "")).strip()
+    if source == "fallback":
+        if not fallback:
+            raise ValueError("business.fallback_plan_id deve ser informado quando plan_id_source=fallback.")
+        return fallback
     regex = re.compile(cfg["business"]["plan_id_regex"])
     if plan_pdf and plan_pdf.exists():
         text = " ".join(page.extract_text() or "" for page in PdfReader(str(plan_pdf)).pages)
@@ -338,7 +345,9 @@ def extract_plan_id(plan_pdf: Path | None, histo_files: tuple[Path, ...], cfg: d
         match = regex.search(read_text(histo))
         if match:
             return match.group(1)
-    return cfg["business"]["fallback_plan_id"]
+    if fallback:
+        return fallback
+    raise ValueError("Não foi possível identificar o ID do plano nos anexos e não há fallback configurado.")
 
 
 def _format_histo_datetime(date_str: str, time_str: str) -> tuple[str, str]:
@@ -355,7 +364,11 @@ def _plan_id_search_patterns(plan_id: str) -> tuple[re.Pattern[str], ...]:
     )
 
 
-def extract_blast_datetime(histo_files: tuple[Path, ...], plan_id: str | None = None) -> tuple[str, str]:
+def extract_blast_datetime(
+    histo_files: tuple[Path, ...],
+    plan_id: str | None = None,
+    allow_unmatched_plan_fallback: bool = False,
+) -> tuple[str, str]:
     if plan_id:
         plan_patterns = _plan_id_search_patterns(plan_id)
         event_pattern = re.compile(r"\[(BlastingPlan|Fire)\](\d{4}/\d{2}/\d{2})-(\d{2}:\d{2}:\d{2})")
@@ -373,14 +386,16 @@ def extract_blast_datetime(histo_files: tuple[Path, ...], plan_id: str | None = 
                     if follow_event.group(1) == "Fire":
                         return _format_histo_datetime(follow_event.group(2), follow_event.group(3))
 
+        if not allow_unmatched_plan_fallback:
+            raise ValueError(f"Não foi encontrado no HISTO um disparo associado ao plano {plan_id}.")
+
     events: list[tuple[str, str, str, int]] = []
     for file in histo_files:
         text = read_text(file)
         for idx, match in enumerate(re.finditer(r"\[Fire\](\d{4}/\d{2}/\d{2})-(\d{2}:\d{2}:\d{2})", text)):
             events.append((file.name, match.group(1), match.group(2), idx))
     if not events:
-        now = datetime.now()
-        return now.strftime("%d/%m/%Y"), now.strftime("%H:%M:%S")
+        raise ValueError("Não foi encontrado nenhum evento [Fire] válido nos arquivos HISTO.")
     file_name, date_str, time_str, _ = sorted(events, reverse=True)[0]
     return _format_histo_datetime(date_str, time_str)
 
