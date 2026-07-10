@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Geração online do Plano de Fogo Realizado em Excel.">
+  <title>PFR | OpenBlast</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="tool-title"><span class="eyebrow">OPENBLAST</span><h1>Plano de Fogo Realizado</h1></div>
+    <img class="logo" src="./assets/openblast-logo.png" alt="OpenBlast">
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div><span class="eyebrow red">PROCESSAMENTO ONLINE</span><h2>Gere o plano realizado em Excel</h2><p>Anexe os arquivos operacionais da frente. O sistema valida, processa e entrega o arquivo final com rastreabilidade.</p></div>
+      <div class="status"><span id="status-dot"></span><span id="status-text">Pronto para processar</span></div>
+    </section>
+
+    <form id="form" class="workspace">
+      <label id="dropzone" class="dropzone" for="inputs">
+        <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt" required>
+        <span class="upload-icon">↑</span><strong>Anexe os arquivos de entrada</strong>
+        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF e TXT</span>
+      </label>
+      <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
+      <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
+    </form>
+
+    <section id="result" class="result" hidden></section>
+    <section class="requirements"><div><span class="number">01</span><strong>Arquivos necessários</strong><p>Projeto completo, config final, PP em PDF e HISTO em TXT.</p></div><div><span class="number">02</span><strong>Validação automática</strong><p>Colunas, plano, data, carga e estrutura são conferidos antes da exportação.</p></div><div><span class="number">03</span><strong>Excel rastreável</strong><p>O arquivo é identificado pelo plano e acompanha um resumo da execução.</p></div></section>
+  </main>
+  <footer>OpenBlast · PFR <span id="year"></span></footer>
+  <script src="./config.js"></script><script src="./app.js"></script>
+</body>
+</html>
