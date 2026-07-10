@@ -1,0 +1,81 @@
+versao: "2.0"
+
+paths:
+  project_root: "."
+  input_root: "input"
+  output_root: "output"
+  backup_root: "backup"
+  log_root: "logs"
+
+inputs:
+  pp:
+    project_patterns:
+      - "*PROJETO COMPLETO*.csv"
+      - "*PROJETO COMPLETO*.xlsx"
+      - "*PROJETO COMPLETO*.xlsm"
+    final_patterns:
+      - "*CONFIG FINAL*.csv"
+      - "*CONFIG FINAL*.xlsx"
+      - "*CONFIG FINAL*.xlsm"
+    plan_pdf_patterns:
+      - "PP.pdf"
+    histo_patterns:
+      - "HISTO-*.txt"
+
+business:
+  output_type_label: "producao"
+  plan_id_source: "fallback"
+  plan_id_regex: "^NAO_EXTRAIR_ID_DO_ARQUIVO$"
+  fallback_plan_id: "330626"
+  redistribute_zero_charges: true
+  charge_total_target_kg: 17136.048
+  charge_zero_fill_min_kg: 0.01
+  output_name_template: "Plano_Fogo_Realizado_PP{plan_id}.xlsx"
+  data_sheet_name: "Dados dos Furos"
+  summary_sheet_name: "Resumo"
+  use_final_detonating_time_as_is: true
+  fill_missing_detonating_time: true
+  simulate_stemming_variation: true
+  simulate_stemming_variation_max: 0.12
+
+validation:
+  required_project_columns:
+    - "Number"
+    - "UTM_X"
+    - "UTM_Y"
+    - "Length_m"
+    - "Stemming_m"
+    - "Diameter_mm"
+    - "Subdrilling_m"
+    - "Angle_deg"
+    - "Azimuth_deg"
+    - "Total_Charge_kg"
+  required_final_columns:
+    - "Number"
+    - "X"
+    - "Y"
+    - "Z"
+    - "X_Toe"
+    - "Y_Toe"
+    - "Z_Toe"
+    - "Length"
+    - "Stemming"
+    - "Diameter"
+    - "Subdrilling"
+    - "Angle"
+    - "Azimuth"
+    - "DetonatingTime"
+    - "InputedCharge"
+  charge_amplification_tolerance: 0.02
+  total_deviation_tolerance: 0.02
+
+export:
+  decimal_places_coordinates: 4
+  decimal_places_values: 1
+  decimal_places_charge: 2
+  decimal_places_stemming_realized: 1
+
+logging:
+  level: "INFO"
+  file_template: "geracao_{date}.log"
+  console: true

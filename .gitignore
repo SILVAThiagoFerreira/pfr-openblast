@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+
+logs/*.log
+backup/
+data/backup/
+data/web_runs/
+data/outputs/
+*.tmp
+~$*
+
+# large local reference material; the web brand asset lives in public/assets
+VISUAL/*.pdf
+VISUAL/*.jpg
+VISUAL/*.png
+VISUAL/OpenBlast/*.png
+!VISUAL/OpenBlast/LOGO OPENBLAST TRANSPARENTE.png

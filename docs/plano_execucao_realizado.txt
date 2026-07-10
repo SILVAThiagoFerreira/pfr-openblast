@@ -1,0 +1,18 @@
+Plano salvo e executado
+
+Objetivo
+- Construir o plano de fogo realizado usando previsto.csv (dados previstos) e realizado.xlsx (dados realizados).
+- Readequar o numero de furos para a realizada.
+- Ajustar cargas para bater com consumo de emulsao informado (97.896 kg).
+
+Regras aplicadas
+- Furos ativos: eliminado == 0 no realizado.xlsx.
+- Mantido total de 784 furos ativos.
+- Dados previstos puxados do previsto.csv por Number.
+- Dados realizados puxados do realizado.xlsx por Number.
+- Para furos sem correspondencia no previsto, usar previsto = realizado como fallback.
+- Ajuste final de carga em dois furos para fechar o consumo total de 97.896 kg.
+
+Arquivos gerados
+- imput/Enaex_DATA_preenchido.csv
+- imput/Plano de Fogo Realizado - 250426_preenchido.xls (aba Enaex_DATA preenchida)
