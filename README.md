@@ -34,6 +34,7 @@ O projeto pode ser usado de duas formas:
 
 - `public/` é a aplicação publicada no GitHub Pages: `https://silvathiagoferreira.github.io/pfr-openblast/`.
 - A página usa processamento local no navegador por padrão. CSV/XLSX, HISTO e as regras determinísticas são executados no próprio computador e o Excel é gerado para download. Não há inteligência artificial, chave de API ou serviço pago.
+- A biblioteca de Excel usada no navegador é distribuída localmente em `public/vendor/`, sem dependência de CDN durante a operação.
 - `src/pfr/web.py` continua disponível para instalações que desejem hospedar o backend Flask separadamente. Esse backend não é necessário para a página pública.
 
 O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir que a página publicada dependa de um endpoint externo. Os anexos não são enviados para servidor no modo público.
