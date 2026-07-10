@@ -1,3 +1,4 @@
-// Defina a URL pública da API quando o backend estiver hospedado separadamente.
-// Em uma instalação Flask no mesmo domínio, deixe vazio.
-window.PFR_API_BASE = 'https://pfr-openblast.onrender.com';
+// O GitHub Pages executa o processamento localmente no navegador.
+// Não há chave de IA, API paga ou envio dos arquivos para um servidor.
+window.PFR_API_BASE = '';
+window.PFR_PROCESSING_MODE = 'browser';

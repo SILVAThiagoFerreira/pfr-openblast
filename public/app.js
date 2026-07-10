@@ -1,16 +1,279 @@
-const API_BASE = (window.PFR_API_BASE || '').replace(/\/$/, '');
-const form = document.querySelector('#form'), input = document.querySelector('#inputs'), list = document.querySelector('#file-list'), drop = document.querySelector('#dropzone'), result = document.querySelector('#result'), button = document.querySelector('#submit'), statusText = document.querySelector('#status-text');
+const form = document.querySelector('#form');
+const input = document.querySelector('#inputs');
+const list = document.querySelector('#file-list');
+const drop = document.querySelector('#dropzone');
+const result = document.querySelector('#result');
+const button = document.querySelector('#submit');
+const statusText = document.querySelector('#status-text');
+const statusBox = document.querySelector('.status');
+
+const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
+const REQUIRED_FINAL = ['Number', 'X', 'Y', 'Z', 'X_Toe', 'Y_Toe', 'Z_Toe', 'Length', 'Stemming', 'Diameter', 'Subdrilling', 'Angle', 'Azimuth', 'DetonatingTime', 'InputedCharge'];
+const OUTPUT_COLUMNS = ['Data', 'Horario', 'Plano', 'Tipo', 'id', 'y', 'x', 'Z (crest)', 'Z (toe)', 'profundidade prevista', 'profundidade realizada', 'azimute', 'inclinacao', 'cargas previstas', 'cargas realizadas', 'tampao previsto', 'tampao realizado', 'subfuracao', 'diametro', 'tempo detonacao (ms)'];
+const ALIASES = {
+  'UTM X': 'UTM_X', 'UTM Y': 'UTM_Y', 'Length (m)': 'Length_m', 'Stemming (m)': 'Stemming_m',
+  'Diameter (mm)': 'Diameter_mm', 'Subdrilling (m)': 'Subdrilling_m', 'Angle (º)': 'Angle_deg',
+  'Angle (°)': 'Angle_deg', 'Azimuth (º)': 'Azimuth_deg', 'Azimuth (°)': 'Azimuth_deg',
+  'Total_Charge (Kg)': 'Total_Charge_kg'
+};
+const BUSINESS = { type: 'producao', fillMissingTime: true, stemmingVariation: true, stemmingMaxDelta: 0.12, redistributeZeroCharges: true, chargeTarget: 17136.048, zeroChargeMinimum: 0.01 };
+
 document.querySelector('#year').textContent = new Date().getFullYear();
-const statusBox=document.querySelector('.status');
-async function checkApi(){ if(!API_BASE){ statusText.textContent='API não configurada'; statusBox.classList.add('offline'); return; } try { const response=await fetch(`${API_BASE}/api/health`,{method:'GET',cache:'no-store'}); if(!response.ok) throw new Error(`HTTP ${response.status}`); statusText.textContent='API online · pronto para processar'; statusBox.classList.remove('offline'); } catch(error) { statusText.textContent='API indisponível · log local disponível'; statusBox.classList.add('offline'); } }
-checkApi();
-function renderFiles(files){ list.replaceChildren(); if(!files.length){ list.append(document.createTextNode('Nenhum arquivo selecionado')); return; } files.forEach(file => { const item=document.createElement('span'); item.className='file'; item.textContent=file.name; list.append(item); }); }
+statusText.textContent = 'Processamento local · sem API ou IA';
+
+function renderFiles(files) {
+  list.replaceChildren();
+  if (!files.length) { list.append(document.createTextNode('Nenhum arquivo selecionado')); return; }
+  files.forEach(file => { const item = document.createElement('span'); item.className = 'file'; item.textContent = file.name; list.append(item); });
+}
+
 input.addEventListener('change', () => renderFiles([...input.files]));
-['dragenter','dragover'].forEach(event => drop.addEventListener(event, e => {e.preventDefault();drop.classList.add('drag')}));
-['dragleave','drop'].forEach(event => drop.addEventListener(event, e => {e.preventDefault();drop.classList.remove('drag')}));
+['dragenter', 'dragover'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.remove('drag'); }));
 drop.addEventListener('drop', e => { input.files = e.dataTransfer.files; renderFiles([...input.files]); });
-async function readPayload(response){ const text=await response.text(); try{return JSON.parse(text)}catch{return {error:response.status===413?'Os anexos excedem o limite de 250 MB.':`A API respondeu com erro HTTP ${response.status}.`}} }
-function escapeHtml(value){ const div=document.createElement('div'); div.textContent=String(value ?? ''); return div.innerHTML; }
-function makeClientLog(error){ const timestamp=new Date().toISOString(); const files=[...input.files].map(file=>file.name).join('\n') || '-'; return `PFR - LOG DE ERRO\nData: ${timestamp}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`; }
-function addLogDownload(container, href, label){ const link=document.createElement('a'); link.className='download log-download'; link.href=href; link.download=href.startsWith('blob:')?'pfr-log-erro.txt':''; link.textContent=label; container.append(link); }
-form.addEventListener('submit', async e => { e.preventDefault(); if(!input.files.length) return; button.disabled=true; statusText.textContent='Processando anexos...'; document.querySelector('.status').classList.add('busy'); result.hidden=true; const data=new FormData(); [...input.files].forEach(file=>data.append('inputs',file)); try { const response=await fetch(`${API_BASE}/api/generate`,{method:'POST',body:data}); const payload=await readPayload(response); if(!response.ok) { const error=new Error(payload.error || 'Não foi possível gerar o arquivo.'); error.serverLog=payload.log_url; throw error; } result.className='result'; result.replaceChildren(); const title=document.createElement('h3'); title.textContent='Plano gerado com sucesso'; result.append(title); result.insertAdjacentHTML('beforeend',`<div class="metrics"><div class="metric"><small>Plano</small><strong>${escapeHtml(payload.plan_id)}</strong></div><div class="metric"><small>Data do disparo</small><strong>${escapeHtml(payload.blast_date)}</strong></div><div class="metric"><small>Total de furos</small><strong>${Number(payload.rows).toLocaleString('pt-BR')}</strong></div><div class="metric"><small>Emulsão</small><strong>${Number(payload.total_emulsion_kg).toFixed(2)} kg</strong></div></div>`); const link=document.createElement('a'); link.className='download'; link.href=`${API_BASE}${payload.download_url}`; link.textContent='Baixar plano realizado (.xlsx) →'; result.append(link); } catch(error) { result.className='result error'; result.replaceChildren(); const title=document.createElement('h3'); title.textContent='Não foi possível gerar o plano'; const message=document.createElement('p'); message.textContent=error.message==='Failed to fetch'?'A API de processamento está indisponível no momento.':error.message; result.append(title,message); if(error.serverLog) addLogDownload(result,`${API_BASE}${error.serverLog}`,'Baixar log técnico (.txt) →'); else { const blobUrl=URL.createObjectURL(new Blob([makeClientLog(error)],{type:'text/plain;charset=utf-8'})); addLogDownload(result,blobUrl,'Baixar log de conexão (.txt) →'); } } finally { result.hidden=false; button.disabled=false; statusText.textContent=statusBox.classList.contains('offline')?'API indisponível · log local disponível':'Pronto para processar'; document.querySelector('.status').classList.remove('busy'); result.scrollIntoView({behavior:'smooth',block:'nearest'}); } });
+
+function makeClientLog(error) {
+  const files = [...input.files].map(file => file.name).join('\n') || '-';
+  return `PFR - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento local no navegador\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+}
+
+function addLogDownload(container, text) {
+  const link = document.createElement('a');
+  link.className = 'download log-download';
+  link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  link.download = 'pfr-log-erro.txt';
+  link.textContent = 'Baixar log local (.txt) →';
+  container.append(link);
+}
+
+function parseNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  let text = String(value).trim().replace(/\s/g, '');
+  if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
+  else text = text.replace(',', '.');
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
+function key(value) {
+  const number = parseNumber(value);
+  return number === null ? String(value ?? '').trim() : String(number);
+}
+
+function normalizeRows(rows) {
+  return rows.map(row => Object.fromEntries(Object.entries(row).map(([name, value]) => [ALIASES[name.trim()] || name.trim(), value])));
+}
+
+async function readTable(file) {
+  const ext = file.name.toLowerCase().split('.').pop();
+  if (!['csv', 'xlsx', 'xlsm'].includes(ext)) throw new Error(`Formato de tabela não permitido: ${file.name}`);
+  const bytes = await file.arrayBuffer();
+  const workbook = ext === 'csv'
+    ? XLSX.read(new TextDecoder('utf-8').decode(bytes), { type: 'string', raw: true })
+    : XLSX.read(bytes, { type: 'array', cellDates: false });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  return normalizeRows(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+}
+
+function requireColumns(rows, columns, label) {
+  const available = new Set(rows.flatMap(row => Object.keys(row)));
+  const missing = columns.filter(column => !available.has(column));
+  if (!rows.length) throw new Error(`O arquivo ${label} está vazio.`);
+  if (missing.length) throw new Error(`${label}: colunas obrigatórias ausentes: ${missing.join(', ')}.`);
+}
+
+function findFile(files, predicate, label) {
+  const file = files.find(predicate);
+  if (!file) throw new Error(`Arquivo obrigatório não encontrado: ${label}.`);
+  return file;
+}
+
+function findSources(files) {
+  const tables = files.filter(file => /\.(csv|xlsx|xlsm)$/i.test(file.name));
+  const project = tables.find(file => /projeto\s*completo/i.test(file.name));
+  const final = tables.find(file => /config\s*final/i.test(file.name));
+  const histo = files.find(file => /^HISTO-.*\.txt$/i.test(file.name)) || files.find(file => /histo/i.test(file.name) && /\.txt$/i.test(file.name));
+  const pdf = files.find(file => /\.pdf$/i.test(file.name));
+  if (!project || !final) {
+    throw new Error('Envie os dois arquivos de tabela: projeto completo e config final.');
+  }
+  if (!histo) throw new Error('Envie o arquivo HISTO-*.txt.');
+  if (!pdf) throw new Error('Envie o PP.pdf.');
+  return { project, final, histo, pdf };
+}
+
+function formatDate(date) {
+  const [year, month, day] = date.split('/');
+  return `${day}/${month}/${year}`;
+}
+
+function extractPlanAndFire(text) {
+  const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
+  const events = [...text.matchAll(eventRegex)];
+  const plans = [...text.matchAll(/\bPP(\d{6})\b/gi)].map(match => match[1]);
+  const planId = [...new Set(plans)].pop();
+  if (!planId) throw new Error('Não foi possível identificar o plano no HISTO.');
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (event[1] !== 'BlastingPlan') continue;
+    const end = index + 1 < events.length ? events[index + 1].index : text.length;
+    const block = text.slice(event.index, end);
+    if (!new RegExp(`\\bPP?0*${planId.replace(/^0+/, '')}\\b`, 'i').test(block)) continue;
+    const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
+    if (fire) return { planId, date: formatDate(fire[2]), time: fire[3] };
+  }
+  const fires = events.filter(event => event[1] === 'Fire');
+  if (!fires.length) throw new Error('Não foi encontrado nenhum evento [Fire] válido no HISTO.');
+  const fire = fires[fires.length - 1];
+  return { planId, date: formatDate(fire[2]), time: fire[3] };
+}
+
+function uniqueSequence(lower, upper, count, forbidden) {
+  if (count <= 0) return [];
+  const chosen = [];
+  if (lower !== null && upper !== null) {
+    for (let index = 1; index <= count; index += 1) {
+      let value = Math.floor(lower + ((upper - lower) * index) / (count + 1));
+      if (value <= (chosen[index - 2] ?? lower)) value = (chosen[index - 2] ?? lower) + 1;
+      while (forbidden.has(value) || chosen.includes(value)) value += 1;
+      chosen.push(value);
+    }
+    return chosen;
+  }
+  if (upper !== null) {
+    let value = upper - 1;
+    while (chosen.length < count && value > 0) { if (!forbidden.has(value)) chosen.unshift(value); value -= 1; }
+    if (chosen.length < count) throw new Error('Não foi possível preencher tempos de detonação antes do primeiro valor conhecido.');
+    return chosen;
+  }
+  let value = lower ?? 0;
+  while (chosen.length < count) { value += 1; if (!forbidden.has(value)) chosen.push(value); }
+  return chosen;
+}
+
+function fillMissingTimes(values) {
+  const result = values.slice();
+  const forbidden = new Set(values.filter(value => value !== null).map(value => Math.round(value)));
+  let imputed = 0;
+  let start = 0;
+  while (start < values.length) {
+    if (values[start] !== null) { start += 1; continue; }
+    let end = start;
+    while (end < values.length && values[end] === null) end += 1;
+    let left = null; for (let index = start - 1; index >= 0; index -= 1) if (values[index] !== null) { left = Math.round(values[index]); break; }
+    let right = null; for (let index = end; index < values.length; index += 1) if (values[index] !== null) { right = Math.round(values[index]); break; }
+    const filled = uniqueSequence(left, right, end - start, forbidden);
+    filled.forEach((value, offset) => { result[start + offset] = value; forbidden.add(value); imputed += 1; });
+    start = end;
+  }
+  return { values: result.map(value => value === null ? null : Math.round(value)), imputed };
+}
+
+async function sha256(bytes) { return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)); }
+
+async function applyStemmingVariation(values, numbers, planId) {
+  if (!BUSINESS.stemmingVariation) return values;
+  const result = values.slice();
+  const encoder = new TextEncoder();
+  for (let index = 0; index < result.length; index += 1) {
+    if (result[index] === null || numbers[index] === null) continue;
+    const digest = await sha256(encoder.encode(`${planId}:${Math.trunc(numbers[index])}:stemming`));
+    const magnitude = (((digest[0] * 0x1000000) + (digest[1] * 0x10000) + (digest[2] * 0x100) + digest[3]) / 0xFFFFFFFF) * BUSINESS.stemmingMaxDelta;
+    const sign = digest[4] % 2 ? 1 : -1;
+    result[index] = Math.max(0, Math.round((result[index] + sign * magnitude) * 100) / 100);
+  }
+  return result.map(value => value === null ? null : Math.round(value * 10) / 10);
+}
+
+function redistributeZeros(values) {
+  const result = values.slice();
+  const zeroIndexes = result.map((value, index) => value === 0 ? index : -1).filter(index => index >= 0);
+  if (!BUSINESS.redistributeZeroCharges || !zeroIndexes.length) return result;
+  const validIndexes = result.map((value, index) => value !== null && value !== 0 ? index : -1).filter(index => index >= 0);
+  if (validIndexes.length < 3) throw new Error('Não há furos suficientes para redistribuir a carga zerada preservando os extremos.');
+  const minIndex = validIndexes.reduce((best, index) => result[index] < result[best] ? index : best, validIndexes[0]);
+  const maxIndex = validIndexes.reduce((best, index) => result[index] > result[best] ? index : best, validIndexes[0]);
+  const adjustable = validIndexes.filter(index => index !== minIndex && index !== maxIndex);
+  const zeroAllocation = BUSINESS.zeroChargeMinimum * zeroIndexes.length;
+  const adjustableTotal = adjustable.reduce((sum, index) => sum + result[index], 0);
+  if (!adjustableTotal || zeroAllocation >= BUSINESS.chargeTarget) throw new Error('Não foi possível redistribuir a carga mantendo os extremos.');
+  zeroIndexes.forEach(index => { result[index] = BUSINESS.zeroChargeMinimum; });
+  adjustable.forEach(index => { result[index] -= (result[index] / adjustableTotal) * zeroAllocation; });
+  const remainder = Math.round((values.reduce((sum, value) => sum + (value ?? 0), 0) - result.reduce((sum, value) => sum + (value ?? 0), 0)) * 1000) / 1000;
+  result[adjustable[0]] = Math.round((result[adjustable[0]] + remainder) * 1000) / 1000;
+  return result;
+}
+
+function buildRows(projectRows, finalRows, event) {
+  const projects = new Map(projectRows.map(row => [key(row.Number), row]));
+  const merged = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }))
+    .filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0)
+    .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
+  const numbers = merged.map(row => parseNumber(row.Number));
+  const times = fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
+  const charges = redistributeZeros(merged.map(row => parseNumber(row.InputedCharge)));
+  const stemming = applyStemmingVariation(merged.map(row => parseNumber(row.Stemming)), numbers, event.planId);
+  return stemming.then(stemmingValues => merged.map((row, index) => {
+    const diameterRaw = parseNumber(row.Diameter);
+    const diameter = diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw;
+    return {
+      Data: event.date, Horario: event.time, Plano: event.planId, Tipo: BUSINESS.type, id: numbers[index],
+      y: parseNumber(row.Y), x: parseNumber(row.X), 'Z (crest)': parseNumber(row.Z), 'Z (toe)': parseNumber(row.Z_Toe),
+      'profundidade prevista': parseNumber(row.Length_m ?? row.p_length), 'profundidade realizada': parseNumber(row.Length),
+      azimute: parseNumber(row.Azimuth), inclinacao: parseNumber(row.Angle), 'cargas previstas': parseNumber(row.Total_Charge_kg),
+      'cargas realizadas': charges[index], 'tampao previsto': parseNumber(row.Stemming_m), 'tampao realizado': stemmingValues[index],
+      subfuracao: parseNumber(row.Subdrilling) ?? parseNumber(row.Subdrilling_m), diametro: diameter, 'tempo detonacao (ms)': times[index]
+    };
+  }));
+}
+
+function buildWorkbook(data, sources, event) {
+  const sheet = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLUMNS });
+  sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
+  const totalDepth = data.reduce((sum, row) => sum + (row['profundidade realizada'] ?? 0), 0);
+  const totalCharge = data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0);
+  const summary = XLSX.utils.aoa_to_sheet([
+    ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time], ['Total de furos', data.length],
+    ['Profundidade total (m)', Math.round(totalDepth * 100) / 100], ['Carga total (kg)', Math.round(totalCharge * 100) / 100],
+    ['Arquivo projeto', sources.project.name], ['Arquivo realizado', sources.final.name], ['Arquivo PDF', sources.pdf.name]
+  ]);
+  summary['!cols'] = [{ wch: 28 }, { wch: 42 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Dados dos Furos');
+  XLSX.utils.book_append_sheet(workbook, summary, 'Resumo');
+  return workbook;
+}
+
+async function generateLocally(files) {
+  if (typeof XLSX === 'undefined') throw new Error('A biblioteca local de Excel não carregou. Recarregue a página e tente novamente.');
+  const sources = findSources(files);
+  const [projectRows, finalRows, histoText] = await Promise.all([readTable(sources.project), readTable(sources.final), sources.histo.text()]);
+  requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
+  requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
+  const event = extractPlanAndFire(histoText);
+  const data = await buildRows(projectRows, finalRows, event);
+  if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
+  return { workbook: buildWorkbook(data, sources, event), event, rows: data.length, totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0) };
+}
+
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!input.files.length) return;
+  button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Validando e processando localmente...';
+  try {
+    const generated = await generateLocally([...input.files]);
+    const filename = `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`;
+    const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
+    const link = document.createElement('a');
+    link.className = 'download'; link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    link.download = filename; link.textContent = 'Baixar plano realizado (.xlsx) →';
+    result.className = 'result'; result.replaceChildren();
+    const title = document.createElement('h3'); title.textContent = 'Plano gerado com sucesso'; result.append(title);
+    const metrics = document.createElement('div'); metrics.className = 'metrics';
+    [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]].forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
+    result.append(metrics, link); statusText.textContent = 'Processamento local concluído';
+  } catch (error) {
+    result.className = 'result error'; result.replaceChildren(); const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano'; const message = document.createElement('p'); message.textContent = error.message || String(error); result.append(title, message); addLogDownload(result, makeClientLog(error)); statusText.textContent = 'Falha na validação local';
+  } finally { result.hidden = false; button.disabled = false; statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+});

@@ -30,12 +30,13 @@ python main.py --web --host 127.0.0.1 --port 5000
 
 ## Operação online
 
-O projeto tem duas camadas publicadas a partir do mesmo repositório:
+O projeto pode ser usado de duas formas:
 
-- `public/` é a interface estática publicada no GitHub Pages: `https://silvathiagoferreira.github.io/pfr-openblast/`.
-- `src/pfr/web.py` é a API Flask que recebe os anexos, cria uma execução isolada, roda o pipeline auditável e devolve o `.xlsx`. O `render.yaml` e o `Dockerfile` permitem hospedá-la em `https://pfr-openblast.onrender.com`.
+- `public/` é a aplicação publicada no GitHub Pages: `https://silvathiagoferreira.github.io/pfr-openblast/`.
+- A página usa processamento local no navegador por padrão. CSV/XLSX, HISTO e as regras determinísticas são executados no próprio computador e o Excel é gerado para download. Não há inteligência artificial, chave de API ou serviço pago.
+- `src/pfr/web.py` continua disponível para instalações que desejem hospedar o backend Flask separadamente. Esse backend não é necessário para a página pública.
 
-O arquivo `public/config.js` aponta a interface para a API pública. Para uma instalação em outro domínio, altere apenas `window.PFR_API_BASE`. O processamento nunca depende de arquivos do computador do usuário: os anexos são enviados para a execução temporária do backend e descartados quando há falha.
+O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir que a página publicada dependa de um endpoint externo. Os anexos não são enviados para servidor no modo público.
 
 ### Proteções da interface online
 
@@ -45,7 +46,7 @@ O arquivo `public/config.js` aponta a interface para a API pública. Para uma in
 - Falhas de identificação do plano ou do evento `[Fire]` interrompem a execução; o sistema não usa a data/hora atual como substituição.
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
-- Em caso de falha, o backend preserva o log técnico da execução para download em `.txt`; se a API estiver indisponível, a interface gera um log local de conexão no navegador.
+- Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`.
 
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. A data/hora do disparo e extraida do `HISTO-*.txt` pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` que contem esse plano. Quando o PDF trouxer o plano com zero à esquerda e o `HISTO` registrar a mesma frente sem esse zero, o sistema trata as duas formas como equivalentes.
