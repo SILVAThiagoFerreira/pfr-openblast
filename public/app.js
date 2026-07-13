@@ -27,7 +27,7 @@ if (typeof XLSX === 'undefined') {
   statusText.textContent = 'Biblioteca Excel indisponível · recarregue a página';
   statusBox.classList.add('offline');
 } else {
-  statusText.textContent = 'Processamento local · sem API ou IA';
+  statusText.textContent = 'Online';
 }
 
 function renderFiles(files) {
@@ -43,14 +43,14 @@ drop.addEventListener('drop', e => { input.files = e.dataTransfer.files; renderF
 
 function makeClientLog(error) {
   const files = [...input.files].map(file => file.name).join('\n') || '-';
-  return `PFR - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento local no navegador\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
 function addLogDownload(container, text) {
   const link = document.createElement('a');
   link.className = 'download log-download';
   link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-  link.download = 'pfr-log-erro.txt';
+  link.download = 'openblast-log-erro.txt';
   link.textContent = 'Baixar log local (.txt) →';
   container.append(link);
 }
@@ -311,7 +311,7 @@ form.addEventListener('submit', async event => {
     const title = document.createElement('h3'); title.textContent = 'Plano gerado com sucesso'; result.append(title);
     const metrics = document.createElement('div'); metrics.className = 'metrics';
     [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]].forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
-    result.append(metrics, link); statusText.textContent = 'Processamento local concluído';
+    result.append(metrics, link); statusText.textContent = 'Online';
   } catch (error) {
     result.className = 'result error'; result.replaceChildren(); const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano'; const message = document.createElement('p'); message.textContent = error.message || String(error); result.append(title, message); addLogDownload(result, makeClientLog(error)); statusText.textContent = 'Falha na validação local';
   } finally { result.hidden = false; button.disabled = false; statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
