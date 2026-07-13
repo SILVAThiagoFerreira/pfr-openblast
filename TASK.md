@@ -20,3 +20,7 @@ Critério objetivo de conclusão:
 - a configuração centraliza caminhos e parâmetros;
 - o fluxo executa por um único entrypoint;
 - as etapas de leitura, validação, processamento e exportação estão separadas.
+
+## Atualização do modo online
+- Permitir inclusão e remoção incremental de anexos sem reiniciar a seleção.
+- Reconhecer variações do ID do plano no HISTO, no nome do arquivo e nas tabelas, incluindo zeros à esquerda e separadores.

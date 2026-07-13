@@ -17,3 +17,6 @@
 15. Montar o resumo.
 16. Exportar o Excel.
 17. Registrar log da execução.
+
+### Modo online incremental
+As seleções sucessivas são acumuladas em memória, com deduplicação por nome, tamanho e data de modificação. A remoção atualiza imediatamente o conjunto submetido. Antes de escolher o evento do HISTO, o pipeline coleta IDs candidatos dos nomes e das primeiras linhas das tabelas e cruza-os com o bloco de plano usando normalização de zeros à esquerda e separadores.

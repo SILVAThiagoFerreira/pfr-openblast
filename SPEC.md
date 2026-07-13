@@ -31,6 +31,9 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
 - Abort ar com erro claro se algo crítico faltar.
 
+## Identificação pública do plano
+No processamento local do navegador, o ID é comparado por sua forma numérica normalizada: o prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que corresponda às pistas dos arquivos/tabelas anexados.
+
 ## Determinismo
 - Ordenação por `Number`.
 - Formatos e nomes fixos via configuração.

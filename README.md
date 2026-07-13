@@ -68,3 +68,6 @@ Quando `business.enforce_charge_total_target` estiver habilitado, o total de `ca
 - `backup/` — backup automático dos insumos
 - `src/` contém a lógica modular.
 - `tests/` contém testes de fumaça e validação básica.
+
+## Anexos no modo online
+Os arquivos podem ser adicionados em várias seleções ou arrastados em momentos diferentes. A lista mantém os anexos já carregados, permite remover cada item individualmente e só então iniciar a validação. A identificação do plano usa também os IDs encontrados nas tabelas e no nome dos arquivos, comparando-os com o HISTO após normalizar zeros à esquerda e separadores comuns.

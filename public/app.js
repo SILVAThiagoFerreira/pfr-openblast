@@ -6,6 +6,7 @@ const result = document.querySelector('#result');
 const button = document.querySelector('#submit');
 const statusText = document.querySelector('#status-text');
 const statusBox = document.querySelector('.status');
+let attachedFiles = [];
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
 const REQUIRED_FINAL = ['Number', 'X', 'Y', 'Z', 'X_Toe', 'Y_Toe', 'Z_Toe', 'Length', 'Stemming', 'Diameter', 'Subdrilling', 'Angle', 'Azimuth', 'DetonatingTime', 'InputedCharge'];
@@ -33,13 +34,54 @@ if (typeof XLSX === 'undefined') {
 function renderFiles(files) {
   list.replaceChildren();
   if (!files.length) { list.append(document.createTextNode('Nenhum arquivo selecionado')); return; }
-  files.forEach(file => { const item = document.createElement('span'); item.className = 'file'; item.textContent = file.name; list.append(item); });
+  files.forEach((file, index) => {
+    const item = document.createElement('span');
+    item.className = 'file';
+    const name = document.createElement('span');
+    name.textContent = file.name;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'file-remove';
+    remove.setAttribute('aria-label', `Remover ${file.name}`);
+    remove.textContent = '×';
+    remove.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      attachedFiles = attachedFiles.filter((_, fileIndex) => fileIndex !== index);
+      syncInputFiles();
+    });
+    item.append(name, remove);
+    list.append(item);
+  });
 }
 
-input.addEventListener('change', () => renderFiles([...input.files]));
+function fileKey(file) { return `${file.name.toLocaleLowerCase()}|${file.size}|${file.lastModified}`; }
+
+function syncInputFiles() {
+  const transfer = new DataTransfer();
+  attachedFiles.forEach(file => transfer.items.add(file));
+  input.files = transfer.files;
+  renderFiles(attachedFiles);
+}
+
+function appendFiles(files) {
+  const existing = new Set(attachedFiles.map(fileKey));
+  for (const file of files) {
+    if (!existing.has(fileKey(file))) {
+      attachedFiles.push(file);
+      existing.add(fileKey(file));
+    }
+  }
+  syncInputFiles();
+}
+
+input.addEventListener('change', () => {
+  appendFiles([...input.files]);
+  input.value = '';
+});
 ['dragenter', 'dragover'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.add('drag'); }));
 ['dragleave', 'drop'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.remove('drag'); }));
-drop.addEventListener('drop', e => { input.files = e.dataTransfer.files; renderFiles([...input.files]); });
+drop.addEventListener('drop', e => appendFiles([...e.dataTransfer.files]));
 
 function makeClientLog(error) {
   const files = [...input.files].map(file => file.name).join('\n') || '-';
@@ -103,6 +145,24 @@ function decodeText(bytes) {
   return utf8.includes('\uFFFD') ? new TextDecoder('windows-1252').decode(bytes) : utf8;
 }
 
+function normalizePlanId(value) {
+  const digits = String(value ?? '').replace(/[^0-9]/g, '');
+  return digits ? digits.replace(/^0+(?=\d)/, '') : '';
+}
+
+function extractPlanIds(value) {
+  return [...String(value ?? '').matchAll(/\bPP\s*[-_./]?\s*(\d{6,8})\b/gi)].map(match => match[1]);
+}
+
+function sourcePlanHints(files, parsedTables) {
+  const hints = [];
+  files.forEach(file => hints.push(...extractPlanIds(file.name)));
+  parsedTables.forEach(item => {
+    item.rows.slice(0, 20).forEach(row => Object.values(row).forEach(value => hints.push(...extractPlanIds(value))));
+  });
+  return [...new Set(hints.map(normalizePlanId).filter(Boolean))];
+}
+
 async function findSources(files) {
   const tables = files.filter(file => /\.(csv|xlsx|xlsm)$/i.test(file.name));
   const parsedTables = await Promise.all(tables.map(async file => {
@@ -127,7 +187,7 @@ async function findSources(files) {
   if (!pdf) throw new Error('Envie o PP.pdf.');
   const pdfHeader = decodeText(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
   if (!pdfHeader.startsWith('%PDF-')) throw new Error(`O arquivo ${pdf.name} não parece ser um PDF válido.`);
-  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry.text, pdf };
+  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry.text, pdf, planHints: sourcePlanHints(files, parsedTables) };
 }
 
 function formatDate(date) {
@@ -143,7 +203,7 @@ function extractPlanAndFire(text) {
     if (event[1] !== 'BlastingPlan') continue;
     const end = index + 1 < events.length ? events[index + 1].index : text.length;
     const block = text.slice(event.index, end);
-    const blockPlans = [...block.matchAll(/\bPP(\d{6})\b/gi)].map(match => match[1]);
+    const blockPlans = extractPlanIds(block).map(normalizePlanId);
     const planId = blockPlans[blockPlans.length - 1];
     if (!planId) continue;
     const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
@@ -156,6 +216,22 @@ function extractPlanAndFire(text) {
   if (!fires.length) throw new Error('Não foi encontrado nenhum evento [Fire] válido no HISTO.');
   const fire = fires[fires.length - 1];
   return { planId, date: formatDate(fire[2]), time: fire[3] };
+}
+
+function extractPlanAndFireForSources(text, hints) {
+  const normalizedHints = new Set(hints);
+  const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
+  const events = [...text.matchAll(eventRegex)];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index][1] !== 'BlastingPlan') continue;
+    const end = index + 1 < events.length ? events[index + 1].index : text.length;
+    const block = text.slice(events[index].index, end);
+    const candidates = extractPlanIds(block).map(normalizePlanId);
+    const matchingPlan = candidates.find(planId => normalizedHints.has(planId));
+    const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
+    if (matchingPlan && fire) return { planId: matchingPlan, date: formatDate(fire[2]), time: fire[3] };
+  }
+  return extractPlanAndFire(text);
 }
 
 function uniqueSequence(lower, upper, count, forbidden) {
@@ -287,10 +363,10 @@ async function generateLocally(files) {
   const names = files.map(file => file.name.trim().toLocaleLowerCase());
   if (new Set(names).size !== names.length) throw new Error('Há arquivos com nomes repetidos no envio. Renomeie-os antes de tentar novamente.');
   const sources = await findSources(files);
-  const { projectRows, finalRows, histoText } = sources;
+  const { projectRows, finalRows, histoText, planHints } = sources;
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
-  const event = extractPlanAndFire(histoText);
+  const event = extractPlanAndFireForSources(histoText, planHints);
   const data = await buildRows(projectRows, finalRows, event);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
   return { workbook: buildWorkbook(data, sources, event), event, rows: data.length, totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0) };
@@ -298,10 +374,10 @@ async function generateLocally(files) {
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
-  if (!input.files.length) return;
+  if (!attachedFiles.length) return;
   button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Validando e processando localmente...';
   try {
-    const generated = await generateLocally([...input.files]);
+    const generated = await generateLocally(attachedFiles);
     const filename = `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`;
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
     const link = document.createElement('a');

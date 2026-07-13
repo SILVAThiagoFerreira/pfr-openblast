@@ -67,3 +67,6 @@ Abas:
 
 Colunas principais em `Dados dos Furos`:
 - `Data`, `Horario`, `Plano`, `Tipo`, `id`, `y`, `x`, `Z (crest)`, `Z (toe)`, `profundidade prevista`, `profundidade realizada`, `azimute`, `inclinacao`, `cargas previstas`, `cargas realizadas`, `tampao previsto`, `tampao realizado`, `subfuracao`, `diametro`, `tempo detonacao (ms)`
+
+## Metadados de identificação
+IDs de plano podem aparecer como `PP370626`, `PP0370626` ou com separadores. Para comparação, o prefixo e os separadores são removidos e zeros à esquerda são ignorados; a forma normalizada é usada apenas para localizar o bloco correto no HISTO.
