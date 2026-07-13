@@ -6,6 +6,10 @@ const result = document.querySelector('#result');
 const button = document.querySelector('#submit');
 const statusText = document.querySelector('#status-text');
 const statusBox = document.querySelector('.status');
+const progress = document.querySelector('#progress');
+const progressLabel = document.querySelector('#progress-label');
+const progressValue = document.querySelector('#progress-value');
+const progressBar = document.querySelector('#progress-bar');
 let attachedFiles = [];
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
@@ -88,6 +92,14 @@ function makeClientLog(error) {
   return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
+function setProgress(value, label) {
+  const percent = Math.max(0, Math.min(100, Math.round(value)));
+  progress.hidden = false;
+  progressLabel.textContent = label;
+  progressValue.textContent = `${percent}%`;
+  progressBar.style.width = `${percent}%`;
+}
+
 function addLogDownload(container, text) {
   const link = document.createElement('a');
   link.className = 'download log-download';
@@ -164,6 +176,7 @@ function sourcePlanHints(files, parsedTables) {
 }
 
 async function findSources(files) {
+  setProgress(12, 'Lendo as tabelas e identificando os arquivos...');
   const tables = files.filter(file => /\.(csv|xlsx|xlsm)$/i.test(file.name));
   const parsedTables = await Promise.all(tables.map(async file => {
     try { return { file, rows: await readTable(file) }; } catch (error) { return { file, rows: [], error }; }
@@ -176,6 +189,7 @@ async function findSources(files) {
     throw new Error('Os arquivos de projeto e realizado precisam ser tabelas diferentes.');
   }
   const textFiles = files.filter(file => /\.txt$/i.test(file.name));
+  setProgress(30, 'Lendo o histórico de disparos...');
   const textCandidates = await Promise.all(textFiles.map(async file => ({ file, text: decodeText(new Uint8Array(await file.arrayBuffer())) })));
   const histoEntry = textCandidates.find(item => /^HISTO-.*\.txt$/i.test(item.file.name))
     || textCandidates.find(item => /histo/i.test(item.file.name))
@@ -373,10 +387,12 @@ async function generateLocally(files) {
   const names = files.map(file => file.name.trim().toLocaleLowerCase());
   if (new Set(names).size !== names.length) throw new Error('Há arquivos com nomes repetidos no envio. Renomeie-os antes de tentar novamente.');
   const sources = await findSources(files);
+  setProgress(48, 'Validando colunas e identificando o plano...');
   const { projectRows, finalRows, histoText, planHints } = sources;
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
   const event = extractPlanAndFireForSources(histoText, planHints);
+  setProgress(62, 'Montando os dados dos furos...');
   const data = await buildRows(projectRows, finalRows, event);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
   return { workbook: buildWorkbook(data, sources, event), event, rows: data.length, totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0) };
@@ -385,9 +401,10 @@ async function generateLocally(files) {
 form.addEventListener('submit', async event => {
   event.preventDefault();
   if (!attachedFiles.length) return;
-  button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Validando e processando localmente...';
+  button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
     const generated = await generateLocally(attachedFiles);
+    setProgress(88, 'Gerando o arquivo Excel...');
     const filename = `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`;
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
     const link = document.createElement('a');
@@ -397,8 +414,8 @@ form.addEventListener('submit', async event => {
     const title = document.createElement('h3'); title.textContent = 'Plano gerado com sucesso'; result.append(title);
     const metrics = document.createElement('div'); metrics.className = 'metrics';
     [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]].forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
-    result.append(metrics, link); statusText.textContent = 'Online';
+    result.append(metrics, link); statusText.textContent = 'Online'; setProgress(100, 'Concluído. O Excel está pronto para baixar.');
   } catch (error) {
-    result.className = 'result error'; result.replaceChildren(); const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano'; const message = document.createElement('p'); message.textContent = error.message || String(error); result.append(title, message); addLogDownload(result, makeClientLog(error)); statusText.textContent = 'Falha na validação local';
+    result.className = 'result error'; result.replaceChildren(); const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano'; const message = document.createElement('p'); message.textContent = error.message || String(error); result.append(title, message); addLogDownload(result, makeClientLog(error)); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
   } finally { result.hidden = false; button.disabled = false; statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 });

@@ -19,13 +19,14 @@
       <div class="status"><span id="status-dot"></span><span id="status-text">Pronto para processar</span></div>
     </section>
 
-    <form id="form" class="workspace">
+    <form id="form" class="workspace" novalidate>
       <label id="dropzone" class="dropzone" for="inputs">
         <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt" required>
         <span class="upload-icon">↑</span><strong>Anexe os arquivos de entrada</strong>
         <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF e TXT</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
+      <div id="progress" class="progress" hidden aria-live="polite"><div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
       <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
     </form>
 
