@@ -151,7 +151,7 @@ function normalizePlanId(value) {
 }
 
 function extractPlanIds(value) {
-  return [...String(value ?? '').matchAll(/\bPP\s*[-_./]?\s*(\d{6,8})\b/gi)].map(match => match[1]);
+  return [...String(value ?? '').matchAll(/\bPP(?:[\s._/-]*\d){6,8}\b/gi)].map(match => match[0]);
 }
 
 function sourcePlanHints(files, parsedTables) {
@@ -209,7 +209,7 @@ function extractPlanAndFire(text) {
     const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
     if (fire) return { planId, date: formatDate(fire[2]), time: fire[3] };
   }
-  const plans = [...text.matchAll(/\bPP(\d{6})\b/gi)].map(match => match[1]);
+  const plans = extractPlanIds(text).map(normalizePlanId);
   const planId = [...new Set(plans)].pop();
   if (!planId) throw new Error('Não foi possível identificar o plano no HISTO.');
   const fires = events.filter(event => event[1] === 'Fire');
@@ -230,6 +230,16 @@ function extractPlanAndFireForSources(text, hints) {
     const matchingPlan = candidates.find(planId => normalizedHints.has(planId));
     const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
     if (matchingPlan && fire) return { planId: matchingPlan, date: formatDate(fire[2]), time: fire[3] };
+  }
+  const histoPlanIds = [...new Set(extractPlanIds(text).map(normalizePlanId).filter(Boolean))];
+  const fires = events.filter(event => event[1] === 'Fire');
+  if (!histoPlanIds.length && normalizedHints.size && fires.length) {
+    const planId = [...normalizedHints][0];
+    const fire = fires[fires.length - 1];
+    return { planId, date: formatDate(fire[2]), time: fire[3] };
+  }
+  if (normalizedHints.size && histoPlanIds.length) {
+    throw new Error(`O plano dos anexos (${[...normalizedHints].join(', ')}) não foi encontrado no HISTO. IDs encontrados: ${histoPlanIds.join(', ')}.`);
   }
   return extractPlanAndFire(text);
 }
