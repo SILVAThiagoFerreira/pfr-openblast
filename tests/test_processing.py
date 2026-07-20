@@ -13,10 +13,30 @@ if str(SRC) not in sys.path:
 
 from pfr.config import load_config, normalize_config  # noqa: E402
 from pfr.export import export_workbook  # noqa: E402
-from pfr.processing import build_output_frame, extract_blast_datetime, extract_plan_id  # noqa: E402
+from pfr.processing import _fill_missing_detonating_time, build_output_frame, extract_blast_datetime, extract_plan_id  # noqa: E402
 
 
 class ProcessingTest(unittest.TestCase):
+    def test_negative_detonating_time_is_imputed_from_sequence(self):
+        result, imputed = _fill_missing_detonating_time(pd.Series([1000, -1, -5, 1300]), True)
+
+        self.assertEqual(result.tolist(), [1000, 1100, 1200, 1300])
+        self.assertEqual(imputed, 2)
+        self.assertEqual(len(set(result.tolist())), 4)
+
+    def test_repeated_detonating_time_is_replaced_and_output_stays_unique(self):
+        result, imputed = _fill_missing_detonating_time(pd.Series([1000, 1000, 1300]), True)
+
+        self.assertEqual(result.tolist(), [1000, 1150, 1300])
+        self.assertEqual(imputed, 1)
+        self.assertEqual(len(set(result.tolist())), 3)
+
+    def test_negative_detonating_time_after_last_anchor_is_imputed(self):
+        result, imputed = _fill_missing_detonating_time(pd.Series([10067, -1, -1]), True)
+
+        self.assertEqual(result.tolist(), [10067, 10068, 10069])
+        self.assertEqual(imputed, 2)
+
     def test_plan_id_for_pp230426_b_is_resolved_from_fallback_and_matches_histo_block(self):
         cfg = normalize_config(load_config(ROOT / "config_PP230426_B.yaml"), ROOT)
         histo_content = """[BlastingPlan]2026/06/19-12:10:50;82;+38.7

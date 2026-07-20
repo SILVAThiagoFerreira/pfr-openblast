@@ -7,7 +7,7 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 2. Valida estrutura e colunas.
 3. Cria backup dos insumos.
 4. Resolve ID do plano e data/hora do disparo.
-5. Consolida os dados e aplica as regras de negócio, incluindo preenchimento determinístico de `tempo detonacao (ms)` vazio, fechamento opcional da carga total aplicada ao alvo configurado preservando os extremos da coluna e, em modo de teste, variação controlada de `tampao realizado` com exportação de `tampao previsto` / `tampao realizado` em uma casa decimal.
+5. Consolida os dados e aplica as regras de negócio, incluindo preenchimento determinístico de `tempo detonacao (ms)` vazio, negativo, inválido ou repetido pela posição do furo na sequência `Number`, garantindo tempos inteiros e únicos; também faz o fechamento opcional da carga total aplicada ao alvo configurado preservando os extremos da coluna e, em modo de teste, aplica variação controlada de `tampao realizado` com exportação de `tampao previsto` / `tampao realizado` em uma casa decimal.
 6. Exporta o Excel final com rastreabilidade.
 
 ## Entradas

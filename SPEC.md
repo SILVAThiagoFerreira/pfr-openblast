@@ -18,7 +18,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - IDs numéricos presentes em linhas de teste, detonadores ou eventos como `TestDetsResult` não são IDs de plano e não podem nomear a saída.
 - Registros com `eliminated == 1` não entram na saída.
 - O campo `eliminated` é tratado como opcional no arquivo final; quando ausente, a validação não bloqueia a execução.
-- `DetonatingTime` vazio é preenchido por uma sequência determinística e única entre os valores válidos da sequência ordenada por `Number`, sem criar tempos repetidos novos.
+- `DetonatingTime` vazio, não numérico, negativo (incluindo `-1`) ou repetido é tratado como ausência. O sistema analisa a posição do furo na sequência ordenada por `Number`, usa os tempos válidos anterior e posterior como âncoras e gera uma sequência determinística de milissegundos inteiros, sempre sem repetir nenhum tempo na saída. Quando não houver espaço inteiro entre as âncoras, a sequência é estendida de forma determinística para preservar a unicidade.
 - Quando a simulação de teste de tampão estiver habilitada, `tampao realizado` recebe uma variação determinística de até `0,12` para mais ou para menos e `tampao previsto` / `tampao realizado` são exportados com uma casa decimal.
 - Quando houver `cargas realizadas` zeradas, o fluxo deve redistribuir uma carga mínima configurada sem alterar o total alvo e sem modificar o menor nem o maior valor da coluna.
 - Quando `business.enforce_charge_total_target` estiver habilitado, o total final de `cargas realizadas` deve fechar exatamente em `business.charge_total_target_kg`, mesmo sem cargas zeradas, sem alterar o furo de menor carga nem o de maior carga e sem criar valores fora desses limites.
@@ -31,6 +31,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Verificar colunas mínimas do projeto e do realizado.
 - Se houver cargas zeradas, exigir `business.charge_total_target_kg` e aplicar a redistribuição configurada sem alterar os extremos da coluna.
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
+- Validar que todos os tempos de detonação exportados sejam inteiros, não negativos, preenchidos e únicos.
 - Abort ar com erro claro se algo crítico faltar.
 
 ## Identificação pública do plano

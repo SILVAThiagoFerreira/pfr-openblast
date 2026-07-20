@@ -10,7 +10,7 @@
 8. Se houver mais de um bloco compatível, priorizar mês coincidente; se a ambiguidade permanecer, interromper e listar os candidatos, sem escolher um bloco arbitrariamente.
 9. Ler o projeto e o realizado.
 10. Mesclar os dados pelo `Number`.
-11. Preencher `DetonatingTime` vazio por sequência determinística e única, quando habilitado, sem criar tempos repetidos novos.
+11. Normalizar `DetonatingTime`: valores vazios, não numéricos, negativos (inclusive `-1`) e repetições posteriores são posições sem tempo. Ordenar os furos por `Number`, analisar as âncoras anterior/posterior e preencher cada bloco com tempos inteiros determinísticos, sempre únicos; se o intervalo não comportar todos os valores, extrapolar deterministicamente para manter a unicidade.
 12. Redistribuir cargas zeradas quando configurado, preservando o total alvo e os extremos da coluna.
 13. Fechar o total de `cargas realizadas` ao alvo configurado quando `business.enforce_charge_total_target` estiver habilitado, preservando o menor e o maior valor da coluna.
 14. Aplicar simulação determinística de variação em `tampao realizado` quando configurada e exportar `tampao previsto` / `tampao realizado` com uma casa decimal.
@@ -18,6 +18,8 @@
 16. Montar o resumo.
 17. Exportar o Excel.
 18. Registrar log da execução.
+
+19. Validar a saída final e interromper a exportação se houver tempo vazio, negativo ou repetido.
 
 ### Modo online incremental
 As seleções sucessivas são acumuladas em memória, com deduplicação por nome, tamanho e data de modificação. A remoção atualiza imediatamente o conjunto submetido. Antes de escolher o evento do HISTO, o pipeline coleta IDs candidatos dos nomes e das primeiras linhas das tabelas e cruza-os com o bloco de plano usando a composição `PLANO;MÊS;ANO`: zeros à esquerda e separadores são normalizados, o ano é preservado e o mês não impede a associação.

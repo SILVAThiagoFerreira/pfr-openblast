@@ -22,44 +22,47 @@ def _unique_integer_sequence(lower: int | None, upper: int | None, count: int, f
     if count <= 0:
         return []
 
-    if lower is not None and upper is not None:
-        candidates = np.floor(np.linspace(lower, upper, count + 2)[1:-1]).astype(int).tolist()
-        chosen: list[int] = []
-        cursor = lower
-        for idx, candidate in enumerate(candidates):
-            value = int(candidate)
-            if value <= cursor:
-                value = cursor + 1
-            while value in forbidden or value in chosen:
-                value += 1
-            cursor = value
-            chosen.append(value)
-        return chosen
+    available_interior = 0
+    if lower is not None and upper is not None and upper > lower:
+        blocked = sum(1 for value in forbidden if lower < value < upper)
+        available_interior = max(0, upper - lower - 1 - blocked)
 
-    if upper is not None:
+    if lower is not None and upper is not None and upper > lower and available_interior >= count:
+        chosen: list[int] = []
+        previous = lower
+        for index in range(1, count + 1):
+            remaining = count - index
+            value = max(previous + 1, int(np.floor(lower + ((upper - lower) * index) / (count + 1))))
+            max_value = upper - remaining - 1
+            while value <= max_value and (value in forbidden or value in chosen):
+                value += 1
+            if value > max_value:
+                break
+            chosen.append(value)
+            previous = value
+        if len(chosen) == count:
+            return chosen
+
+    if upper is not None and lower is None:
         candidates: list[int] = []
         value = upper - 1
-        while len(candidates) < count and value > 0:
+        while len(candidates) < count and value >= 0:
             if value not in forbidden:
                 candidates.append(value)
             value -= 1
-        if len(candidates) < count:
-            raise ValueError("Nao foi possivel imputar tempos detonacao unicos antes do primeiro valor conhecido.")
-        return list(reversed(candidates))
+        if len(candidates) == count:
+            return list(reversed(candidates))
 
-    if lower is not None:
-        candidates: list[int] = []
-        value = lower + 1
-        while len(candidates) < count:
-            if value not in forbidden:
-                candidates.append(value)
+    chosen = []
+    value = lower + 1 if lower is not None else (upper + 1 if upper is not None else 1)
+    while len(chosen) < count:
+        value = max(0, int(value))
+        while value in forbidden or value in chosen:
             value += 1
-        return candidates
+        chosen.append(value)
+        value += 1
+    return chosen
 
-    start = 1
-    while any((start + offset) in forbidden for offset in range(count)):
-        start += 1
-    return list(range(start, start + count))
 
 
 def _fill_missing_detonating_time(series: pd.Series, enabled: bool) -> tuple[pd.Series, int]:
@@ -67,35 +70,32 @@ def _fill_missing_detonating_time(series: pd.Series, enabled: bool) -> tuple[pd.
     if not enabled:
         return values.round(0).astype("Int64"), 0
 
-    result = values.round(0).astype("Int64").copy()
-    forbidden = {int(value) for value in values.dropna().round(0).astype(int).tolist()}
-    missing_positions = [idx for idx, value in enumerate(values.isna().tolist()) if value]
+    normalized = values.round(0).where(values >= 0)
+    result = pd.Series(pd.NA, index=values.index, dtype="Int64")
+    forbidden: set[int] = set()
+    for position, value in enumerate(normalized.tolist()):
+        if pd.isna(value):
+            continue
+        integer_value = int(value)
+        if integer_value in forbidden:
+            continue
+        result.iloc[position] = integer_value
+        forbidden.add(integer_value)
+
     imputed = 0
 
-    if not missing_positions:
-        return result, imputed
-
     start = 0
-    while start < len(values):
-        if not pd.isna(values.iloc[start]):
+    while start < len(result):
+        if not pd.isna(result.iloc[start]):
             start += 1
             continue
 
         end = start
-        while end < len(values) and pd.isna(values.iloc[end]):
+        while end < len(result) and pd.isna(result.iloc[end]):
             end += 1
 
-        left_value = None
-        for left_idx in range(start - 1, -1, -1):
-            if not pd.isna(values.iloc[left_idx]):
-                left_value = int(round(float(values.iloc[left_idx])))
-                break
-
-        right_value = None
-        for right_idx in range(end, len(values)):
-            if not pd.isna(values.iloc[right_idx]):
-                right_value = int(round(float(values.iloc[right_idx])))
-                break
+        left_value = next((int(result.iloc[index]) for index in range(start - 1, -1, -1) if not pd.isna(result.iloc[index])), None)
+        right_value = next((int(result.iloc[index]) for index in range(end, len(result)) if not pd.isna(result.iloc[index])), None)
 
         block_count = end - start
         block_values = _unique_integer_sequence(left_value, right_value, block_count, forbidden)

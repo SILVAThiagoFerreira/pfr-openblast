@@ -197,47 +197,6 @@ async function findSources(files) {
   return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry.text, pdf, planHints: sourcePlanHints(files, parsedTables) };
 }
 
-function uniqueSequence(lower, upper, count, forbidden) {
-  if (count <= 0) return [];
-  const chosen = [];
-  if (lower !== null && upper !== null) {
-    for (let index = 1; index <= count; index += 1) {
-      let value = Math.floor(lower + ((upper - lower) * index) / (count + 1));
-      if (value <= (chosen[index - 2] ?? lower)) value = (chosen[index - 2] ?? lower) + 1;
-      while (forbidden.has(value) || chosen.includes(value)) value += 1;
-      chosen.push(value);
-    }
-    return chosen;
-  }
-  if (upper !== null) {
-    let value = upper - 1;
-    while (chosen.length < count && value > 0) { if (!forbidden.has(value)) chosen.unshift(value); value -= 1; }
-    if (chosen.length < count) throw new Error('Não foi possível preencher tempos de detonação antes do primeiro valor conhecido.');
-    return chosen;
-  }
-  let value = lower ?? 0;
-  while (chosen.length < count) { value += 1; if (!forbidden.has(value)) chosen.push(value); }
-  return chosen;
-}
-
-function fillMissingTimes(values) {
-  const result = values.slice();
-  const forbidden = new Set(values.filter(value => value !== null).map(value => Math.round(value)));
-  let imputed = 0;
-  let start = 0;
-  while (start < values.length) {
-    if (values[start] !== null) { start += 1; continue; }
-    let end = start;
-    while (end < values.length && values[end] === null) end += 1;
-    let left = null; for (let index = start - 1; index >= 0; index -= 1) if (values[index] !== null) { left = Math.round(values[index]); break; }
-    let right = null; for (let index = end; index < values.length; index += 1) if (values[index] !== null) { right = Math.round(values[index]); break; }
-    const filled = uniqueSequence(left, right, end - start, forbidden);
-    filled.forEach((value, offset) => { result[start + offset] = value; forbidden.add(value); imputed += 1; });
-    start = end;
-  }
-  return { values: result.map(value => value === null ? null : Math.round(value)), imputed };
-}
-
 async function sha256(bytes) {
   if (globalThis.crypto?.subtle) return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   let hash = 2166136261;
@@ -284,7 +243,7 @@ function buildRows(projectRows, finalRows, event) {
     .filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0)
     .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
   const numbers = merged.map(row => parseNumber(row.Number));
-  const times = fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
+  const times = window.OpenBlastTiming.fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
   const charges = redistributeZeros(merged.map(row => parseNumber(row.InputedCharge)));
   const stemming = applyStemmingVariation(merged.map(row => parseNumber(row.Stemming)), numbers, event.planId);
   return stemming.then(stemmingValues => merged.map((row, index) => {
@@ -334,6 +293,9 @@ async function generateLocally(files) {
   setProgress(62, 'Montando os dados dos furos...');
   const data = await buildRows(projectRows, finalRows, event);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
+  const timing = data.map(row => row['tempo detonacao (ms)']);
+  if (timing.some(value => !Number.isInteger(value) || value < 0)) throw new Error('Há furos sem uma temporização inteira e não negativa após a simulação.');
+  if (new Set(timing).size !== timing.length) throw new Error('Há furos com temporização repetida após a simulação.');
   return { workbook: buildWorkbook(data, sources, event), event, rows: data.length, totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0) };
 }
 

@@ -35,46 +35,52 @@ def validate_output(data: pd.DataFrame, input_charges: pd.Series, cfg: dict) -> 
     total_deviation_tolerance = float(validation.get("total_deviation_tolerance", 0.02))
     max_charge_per_delay_kg = validation.get("max_charge_per_delay_kg")
 
+    timing = pd.to_numeric(data["tempo detonacao (ms)"], errors="coerce")
+    if timing.isna().any():
+        errors.append("Tempo de detonacao ausente ou invalido em um ou mais furos.")
+    if (timing < 0).any():
+        errors.append("Tempo de detonacao negativo encontrado na saida.")
+    if timing.dropna().duplicated().any():
+        errors.append("Tempos de detonacao repetidos encontrados na saida; cada furo deve ter um tempo unico.")
+
     realized = pd.to_numeric(data["cargas realizadas"], errors="coerce")
     input_valid = pd.to_numeric(input_charges, errors="coerce").dropna()
 
-    if input_valid.empty:
-        return
+    if not input_valid.empty:
+        max_input_charge = float(input_valid.max())
+        max_realized_charge = float(realized.max())
+        if max_input_charge > 0:
+            amplification = (max_realized_charge - max_input_charge) / max_input_charge
+            if amplification > charge_amplification_tolerance:
+                errors.append(
+                    f"Carga realizada maxima ({max_realized_charge:.2f} kg) excede "
+                    f"a carga prevista maxima ({max_input_charge:.2f} kg) em {amplification:.1%}. "
+                    f"Tolerancia: {charge_amplification_tolerance:.0%}"
+                )
 
-    max_input_charge = float(input_valid.max())
-    max_realized_charge = float(realized.max())
-    if max_input_charge > 0:
-        amplification = (max_realized_charge - max_input_charge) / max_input_charge
-        if amplification > charge_amplification_tolerance:
-            errors.append(
-                f"Carga realizada maxima ({max_realized_charge:.2f} kg) excede "
-                f"a carga prevista maxima ({max_input_charge:.2f} kg) em {amplification:.1%}. "
-                f"Tolerancia: {charge_amplification_tolerance:.0%}"
-            )
+        input_total = float(input_valid.sum())
+        realized_total = float(realized.sum())
+        enforce_total = cfg.get("business", {}).get("enforce_charge_total_target", False)
+        if not enforce_total and input_total > 0:
+            deviation = abs(realized_total - input_total) / input_total
+            if deviation > total_deviation_tolerance:
+                errors.append(
+                    f"Carga total realizada ({realized_total:.2f} kg) difere do total "
+                    f"previsto ({input_total:.2f} kg) em {deviation:.1%}. "
+                    f"Tolerancia: {total_deviation_tolerance:.0%}"
+                )
 
-    input_total = float(input_valid.sum())
-    realized_total = float(realized.sum())
-    enforce_total = cfg.get("business", {}).get("enforce_charge_total_target", False)
-    if not enforce_total and input_total > 0:
-        deviation = abs(realized_total - input_total) / input_total
-        if deviation > total_deviation_tolerance:
-            errors.append(
-                f"Carga total realizada ({realized_total:.2f} kg) difere do total "
-                f"previsto ({input_total:.2f} kg) em {deviation:.1%}. "
-                f"Tolerancia: {total_deviation_tolerance:.0%}"
+        if max_charge_per_delay_kg is not None:
+            delay_groups = data.groupby("tempo detonacao (ms)")["cargas realizadas"].apply(
+                lambda s: pd.to_numeric(s, errors="coerce").sum()
             )
-
-    if max_charge_per_delay_kg is not None:
-        delay_groups = data.groupby("tempo detonacao (ms)")["cargas realizadas"].apply(
-            lambda s: pd.to_numeric(s, errors="coerce").sum()
-        )
-        max_delay_charge = float(delay_groups.max())
-        if max_delay_charge > float(max_charge_per_delay_kg):
-            max_delay_ms = float(delay_groups.idxmax())
-            errors.append(
-                f"Carga maxima por espera ({max_delay_charge:.2f} kg no delay {max_delay_ms:.0f} ms) "
-                f"excede o limite configurado ({max_charge_per_delay_kg} kg)."
-            )
+            max_delay_charge = float(delay_groups.max())
+            if max_delay_charge > float(max_charge_per_delay_kg):
+                max_delay_ms = float(delay_groups.idxmax())
+                errors.append(
+                    f"Carga maxima por espera ({max_delay_charge:.2f} kg no delay {max_delay_ms:.0f} ms) "
+                    f"excede o limite configurado ({max_charge_per_delay_kg} kg)."
+                )
 
     if errors:
         raise ValueError("\n".join(errors))

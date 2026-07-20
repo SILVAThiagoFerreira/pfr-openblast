@@ -32,7 +32,7 @@ Campos principais:
 - `Subdrilling` float
 - `Angle` float
 - `Azimuth` float
-- `DetonatingTime` float, pode ser imputado por sequência determinística sem repetir tempos novos quando vier vazio
+- `DetonatingTime` float na entrada; vazio, não numérico, negativo (inclusive `-1`) e repetição posterior são tratados como ausência. Na saída, é inteiro, não negativo e único por furo, preenchido por sequência determinística baseada na ordem de `Number` e nas âncoras vizinhas.
 - `InputedCharge` float
 - `eliminated` integer, optional
 
