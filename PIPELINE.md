@@ -13,6 +13,7 @@
 11. Normalizar `DetonatingTime`: valores vazios, não numéricos, negativos (inclusive `-1`) e repetições posteriores são posições sem tempo. Ordenar os furos por `Number`, analisar as âncoras anterior/posterior e preencher cada bloco com tempos inteiros determinísticos, sempre únicos; se o intervalo não comportar todos os valores, extrapolar deterministicamente para manter a unicidade.
 12. Redistribuir cargas zeradas quando configurado, preservando o total alvo e os extremos da coluna.
 13. Fechar o total de `cargas realizadas` ao alvo configurado quando `business.enforce_charge_total_target` estiver habilitado, preservando o menor e o maior valor da coluna.
+   - No site, o usuário pode fornecer um alvo em kg para a execução atual; o valor informado tem precedência sobre a configuração e é aplicado aos furos intermediários, com fechamento exato e erro explícito quando inviável.
 14. Aplicar simulação determinística de variação em `tampao realizado` quando configurada e exportar `tampao previsto` / `tampao realizado` com uma casa decimal.
 15. Montar a tabela final de saída.
 16. Montar o resumo.

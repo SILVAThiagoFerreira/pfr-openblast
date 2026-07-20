@@ -50,6 +50,7 @@ Campos principais:
 - O ajuste só pode atuar nos furos intermediários.
 - O menor e o maior valor de carga devem permanecer inalterados.
 - Nenhum valor ajustado pode ficar abaixo do menor valor preservado nem acima do maior valor preservado.
+- No site, o campo opcional de total de carga realizada fornece o alvo da execução atual e tem precedência sobre a configuração. O alvo deve ser positivo; quando habilitado, a soma final deve fechar no valor informado, com distribuição determinística nos furos intermediários e erro explícito para alvos inviáveis. Sem o campo habilitado, a regra pública permanece desativada.
 
 ## Historico de disparo
 Arquivo: `HISTO-*.txt`

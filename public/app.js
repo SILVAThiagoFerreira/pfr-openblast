@@ -10,6 +10,10 @@ const progress = document.querySelector('#progress');
 const progressLabel = document.querySelector('#progress-label');
 const progressValue = document.querySelector('#progress-value');
 const progressBar = document.querySelector('#progress-bar');
+const chargeTargetToggle = document.querySelector('#enable-charge-target');
+const chargeTargetSettings = document.querySelector('#charge-target-settings');
+const chargeTargetInput = document.querySelector('#charge-target-input');
+const chargeTargetError = document.querySelector('#charge-target-error');
 let attachedFiles = [];
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
@@ -118,6 +122,34 @@ function parseNumber(value) {
   const number = Number(text);
   return Number.isFinite(number) ? number : null;
 }
+
+function setChargeTargetError(message = '') {
+  chargeTargetError.textContent = message;
+  chargeTargetError.hidden = !message;
+  chargeTargetInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function syncChargeTargetControls() {
+  const enabled = chargeTargetToggle.checked;
+  chargeTargetSettings.hidden = !enabled;
+  chargeTargetSettings.setAttribute('aria-hidden', String(!enabled));
+  if (!enabled) setChargeTargetError();
+}
+
+function readChargeTarget() {
+  if (!chargeTargetToggle.checked) return { enabled: false, target: null };
+  const target = parseNumber(chargeTargetInput.value);
+  if (target === null || target <= 0) {
+    setChargeTargetError('Informe um total de carga realizada maior que zero.');
+    throw new Error('Informe um total de carga realizada maior que zero.');
+  }
+  setChargeTargetError();
+  return { enabled: true, target };
+}
+
+chargeTargetToggle.addEventListener('change', syncChargeTargetControls);
+chargeTargetInput.addEventListener('input', () => setChargeTargetError());
+syncChargeTargetControls();
 
 function key(value) {
   const number = parseNumber(value);
@@ -237,14 +269,26 @@ function redistributeZeros(values) {
   return result;
 }
 
-function buildRows(projectRows, finalRows, event) {
+function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
   const projects = new Map(projectRows.map(row => [key(row.Number), row]));
   const merged = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }))
     .filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0)
     .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
   const numbers = merged.map(row => parseNumber(row.Number));
   const times = window.OpenBlastTiming.fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
-  const charges = redistributeZeros(merged.map(row => parseNumber(row.InputedCharge)));
+  const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
+  const baseCharges = redistributeZeros(rawCharges);
+  const positiveIndexes = rawCharges.map((value, index) => value !== null && value > 0 ? index : -1).filter(index => index >= 0);
+  const chargeOptionsWithExtremes = chargeOptions.enabled && positiveIndexes.length >= 2
+    ? {
+      ...chargeOptions,
+      minimumIndex: positiveIndexes.reduce((best, index) => rawCharges[index] < rawCharges[best] ? index : best, positiveIndexes[0]),
+      maximumIndex: positiveIndexes.reduce((best, index) => rawCharges[index] > rawCharges[best] ? index : best, positiveIndexes[0])
+    }
+    : chargeOptions;
+  const charges = chargeOptions.enabled
+    ? window.OpenBlastCharge.distributeCharges(baseCharges, chargeOptions.target, chargeOptionsWithExtremes)
+    : baseCharges;
   const stemming = applyStemmingVariation(merged.map(row => parseNumber(row.Stemming)), numbers, event.planId);
   return stemming.then(stemmingValues => merged.map((row, index) => {
     const diameterRaw = parseNumber(row.Diameter);
@@ -260,16 +304,18 @@ function buildRows(projectRows, finalRows, event) {
   }));
 }
 
-function buildWorkbook(data, sources, event) {
+function buildWorkbook(data, sources, event, chargeOptions = {}) {
   const sheet = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLUMNS });
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
   const totalDepth = data.reduce((sum, row) => sum + (row['profundidade realizada'] ?? 0), 0);
   const totalCharge = data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0);
-  const summary = XLSX.utils.aoa_to_sheet([
+  const summaryRows = [
     ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time], ['Total de furos', data.length],
     ['Profundidade total (m)', Math.round(totalDepth * 100) / 100], ['Carga total (kg)', Math.round(totalCharge * 100) / 100],
     ['Arquivo projeto', sources.project.name], ['Arquivo realizado', sources.final.name], ['Arquivo PDF', sources.pdf.name]
-  ]);
+  ];
+  if (chargeOptions.enabled) summaryRows.splice(7, 0, ['Carga-alvo aplicado (kg)', chargeOptions.target]);
+  const summary = XLSX.utils.aoa_to_sheet(summaryRows);
   summary['!cols'] = [{ wch: 28 }, { wch: 42 }];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Dados dos Furos');
@@ -277,7 +323,7 @@ function buildWorkbook(data, sources, event) {
   return workbook;
 }
 
-async function generateLocally(files) {
+async function generateLocally(files, chargeOptions = {}) {
   if (typeof XLSX === 'undefined') throw new Error('A biblioteca local de Excel não carregou. Recarregue a página e tente novamente.');
   if (files.length > 20) throw new Error('Envie no máximo 20 arquivos por execução.');
   const totalBytes = files.reduce((total, file) => total + file.size, 0);
@@ -291,12 +337,16 @@ async function generateLocally(files) {
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
   const event = resolvePlanAndFire(histoText, planHints);
   setProgress(62, 'Montando os dados dos furos...');
-  const data = await buildRows(projectRows, finalRows, event);
+  const data = await buildRows(projectRows, finalRows, event, chargeOptions);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
   const timing = data.map(row => row['tempo detonacao (ms)']);
   if (timing.some(value => !Number.isInteger(value) || value < 0)) throw new Error('Há furos sem uma temporização inteira e não negativa após a simulação.');
   if (new Set(timing).size !== timing.length) throw new Error('Há furos com temporização repetida após a simulação.');
-  return { workbook: buildWorkbook(data, sources, event), event, rows: data.length, totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0) };
+  return {
+    workbook: buildWorkbook(data, sources, event, chargeOptions), event, rows: data.length,
+    totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0),
+    chargeTargetApplied: Boolean(chargeOptions.enabled), chargeTarget: chargeOptions.target
+  };
 }
 
 form.addEventListener('submit', async event => {
@@ -304,7 +354,7 @@ form.addEventListener('submit', async event => {
   if (!attachedFiles.length) return;
   button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
-    const generated = await generateLocally(attachedFiles);
+    const generated = await generateLocally(attachedFiles, readChargeTarget());
     setProgress(88, 'Gerando o arquivo Excel...');
     const filename = `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`;
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
@@ -312,9 +362,16 @@ form.addEventListener('submit', async event => {
     link.className = 'download'; link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     link.download = filename; link.textContent = 'Baixar plano realizado (.xlsx) →';
     result.className = 'result'; result.replaceChildren();
-    const title = document.createElement('h3'); title.textContent = 'Plano gerado com sucesso'; result.append(title);
+    const title = document.createElement('h3'); title.textContent = generated.chargeTargetApplied ? 'Plano gerado com carga-alvo aplicada' : 'Plano gerado com sucesso'; result.append(title);
+    if (generated.chargeTargetApplied) {
+      const targetNote = document.createElement('p');
+      targetNote.textContent = `Distribuição forçada concluída: ${generated.chargeTarget.toFixed(2)} kg foram distribuídos nos furos intermediários, preservando os extremos.`;
+      result.append(targetNote);
+    }
     const metrics = document.createElement('div'); metrics.className = 'metrics';
-    [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]].forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
+    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]];
+    if (generated.chargeTargetApplied) metricsData.push(['Alvo aplicado', `${generated.chargeTarget.toFixed(2)} kg`]);
+    metricsData.forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
     result.append(metrics, link); statusText.textContent = 'Online'; setProgress(100, 'Concluído. O Excel está pronto para baixar.');
   } catch (error) {
     result.className = 'result error'; result.replaceChildren(); const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano'; const message = document.createElement('p'); message.textContent = error.message || String(error); result.append(title, message); addLogDownload(result, makeClientLog(error)); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');

@@ -26,6 +26,22 @@
         <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF e TXT</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
+      <fieldset class="charge-target">
+        <legend>Distribuição forçada da carga realizada</legend>
+        <label class="charge-target__toggle" for="enable-charge-target">
+          <input id="enable-charge-target" type="checkbox" aria-controls="charge-target-settings">
+          <span>Forçar um total de carga realizada</span>
+        </label>
+        <div id="charge-target-settings" class="charge-target__settings" hidden>
+          <label for="charge-target-input">Total desejado <span>(kg)</span></label>
+          <div class="charge-target__input-wrap">
+            <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-help charge-target-error">
+            <span aria-hidden="true">kg</span>
+          </div>
+          <p id="charge-target-help" class="field-help">A menor e a maior carga permanecem iguais; o restante é distribuído somente nos furos intermediários.</p>
+          <p id="charge-target-error" class="field-error" role="alert" hidden></p>
+        </div>
+      </fieldset>
       <div id="progress" class="progress" hidden aria-live="polite"><div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
       <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
     </form>
@@ -35,6 +51,6 @@
   </main>
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js"></script><script src="./plan-id.js?v=725b31f"></script><script src="./timing.js?v=725b31f"></script><script src="./app.js?v=725b31f"></script>
+  <script src="./config.js"></script><script src="./plan-id.js?v=20260720-carga-alvo"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./app.js?v=20260720-carga-alvo"></script>
 </body>
 </html>

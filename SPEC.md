@@ -22,6 +22,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Quando a simulação de teste de tampão estiver habilitada, `tampao realizado` recebe uma variação determinística de até `0,12` para mais ou para menos e `tampao previsto` / `tampao realizado` são exportados com uma casa decimal.
 - Quando houver `cargas realizadas` zeradas, o fluxo deve redistribuir uma carga mínima configurada sem alterar o total alvo e sem modificar o menor nem o maior valor da coluna.
 - Quando `business.enforce_charge_total_target` estiver habilitado, o total final de `cargas realizadas` deve fechar exatamente em `business.charge_total_target_kg`, mesmo sem cargas zeradas, sem alterar o furo de menor carga nem o de maior carga e sem criar valores fora desses limites.
+- No site, o usuário pode habilitar um alvo de carga realizada em kg. Quando informado, esse valor substitui o alvo configurado apenas para a execução atual e aplica a mesma regra de fechamento: distribuição determinística nos furos intermediários, preservação do menor e do maior valor e total final exato. Sem alvo habilitado, a execução mantém o comportamento padrão.
 - `X` e `Y` são preenchidos a partir do arquivo final e, se faltarem, do arquivo de projeto.
 - `Z (crest)` e `Z (toe)` devem refletir a geometria do arquivo final quando disponível.
 - O arquivo de saída é nomeado com o ID do plano.
@@ -31,6 +32,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Verificar colunas mínimas do projeto e do realizado.
 - Se houver cargas zeradas, exigir `business.charge_total_target_kg` e aplicar a redistribuição configurada sem alterar os extremos da coluna.
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
+- No site, rejeitar alvo ausente, não numérico ou menor/igual a zero; rejeitar também alvos que não possam ser distribuídos entre os limites preservados, com mensagem clara antes do download.
 - Validar que todos os tempos de detonação exportados sejam inteiros, não negativos, preenchidos e únicos.
 - Abort ar com erro claro se algo crítico faltar.
 

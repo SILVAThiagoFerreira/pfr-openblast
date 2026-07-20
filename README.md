@@ -62,6 +62,8 @@ Exemplo validado:
 ## Regra de carga total
 Quando `business.enforce_charge_total_target` estiver habilitado, o total de `cargas realizadas` e fechado em `business.charge_total_target_kg` sem alterar o furo de menor carga nem o de maior carga.
 
+No site, o campo opcional **Forçar total de carga realizada** permite informar esse alvo diretamente em kg para a execução atual. O valor é distribuído entre os furos intermediários, mantendo o menor e o maior valor originais e fechando o total com precisão. Sem habilitar o campo, o site preserva a distribuição padrão; se o alvo for inviável, a validação é interrompida com o motivo.
+
 ## Estrutura
 - `input/` — coloque os arquivos de entrada aqui
 - `output/` — Excel gerado aqui

@@ -15,6 +15,7 @@ Regras operacionais atuais:
 - Quando houver furos com `InputedCharge` zerado, a carga deve ser redistribuída com total alvo configurado, preservando o menor e o maior valor da coluna.
 - Quando `business.enforce_charge_total_target` estiver habilitado, a carga total aplicada deve fechar no alvo configurado mesmo sem furos zerados, preservando o menor e o maior valor da coluna.
 - A publicação no GitHub Pages deve operar sem inteligência artificial, chave de API ou serviço pago; o modo público processa os anexos localmente no navegador.
+- O site deve oferecer um campo opcional para informar o total de carga realizada em kg e, quando habilitado, distribuir a diferença entre os furos intermediários até fechar exatamente o total informado, preservando os extremos e validando alvos inviáveis.
 - A interface pública deve identificar as tabelas pelas colunas, validar a assinatura do PDF, rejeitar anexos duplicados/excessivos e gerar log local quando a validação falhar.
 
 Critério objetivo de conclusão:
