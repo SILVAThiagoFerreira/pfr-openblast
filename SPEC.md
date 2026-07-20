@@ -12,6 +12,8 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 ## Regras
 - O ID do plano deve ser resolvido de forma auditável. Quando a extração automática puder confundir IDs de detonadores, usar `business.plan_id_source: "fallback"` e registrar o plano correto em `business.fallback_plan_id`.
 - Quando o PDF trouxer o plano com zero à esquerda e o HISTO registrar a mesma frente sem esse zero, o sistema deve tratar as duas formas como equivalentes para localizar o bloco operacional correto e nomear a saída pelo ID resolvido.
+- O ID segue a composição `PP<PLANO><MÊS><ANO>`: os quatro últimos dígitos representam mês e ano, e os dígitos anteriores representam o plano. Para localizar o bloco no HISTO, o mês pode ser diferente entre o PDF/arquivos e a detonação; a comparação exige o mesmo plano e ano, ignorando apenas o mês. O ID do evento encontrado no HISTO permanece como o identificador da execução.
+- Se mais de um bloco `[BlastingPlan]` for compatível com o mesmo plano e ano, priorizar o bloco cujo mês coincida com o ID de origem; permanecendo mais de um candidato, abortar com erro explícito de ambiguidade.
 - A data/hora do disparo não deve vir do último `[Fire]` do histórico inteiro. O sistema deve localizar o bloco `[BlastingPlan]` que contém o plano operacional, por exemplo `PP320526`, e usar o primeiro evento `[Fire]` posterior a esse bloco.
 - IDs numéricos presentes em linhas de teste, detonadores ou eventos como `TestDetsResult` não são IDs de plano e não podem nomear a saída.
 - Registros com `eliminated == 1` não entram na saída.
@@ -32,7 +34,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Abort ar com erro claro se algo crítico faltar.
 
 ## Identificação pública do plano
-No processamento local do navegador, o ID é comparado por sua forma numérica normalizada: o prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que corresponda às pistas dos arquivos/tabelas anexados.
+No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`. O prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade do plano. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que tenha o mesmo plano e ano das pistas dos arquivos/tabelas anexados, mesmo quando o mês de emissão for diferente do mês da detonação.
 
 ## Determinismo
 - Ordenação por `Number`.

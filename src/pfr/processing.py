@@ -354,14 +354,48 @@ def _format_histo_datetime(date_str: str, time_str: str) -> tuple[str, str]:
     return datetime.strptime(date_str, "%Y/%m/%d").strftime("%d/%m/%Y"), time_str
 
 
-def _plan_id_search_patterns(plan_id: str) -> tuple[re.Pattern[str], ...]:
-    raw = str(plan_id).strip()
-    candidates = list(dict.fromkeys([raw, raw.lstrip("0") or raw]))
-    return tuple(
-        re.compile(rf"\bPP?{re.escape(candidate)}\b", re.IGNORECASE)
-        for candidate in candidates
-        if candidate
-    )
+_PLAN_ID_PATTERN = re.compile(r"\bPP(?:[\s._/-]*\d){6,8}(?:[_-][A-Z])?\b", re.IGNORECASE)
+
+
+def _plan_id_signature(value: str) -> tuple[str, str] | None:
+    digits = re.sub(r"[^0-9]", "", str(value))
+    if not re.fullmatch(r"\d{6,8}", digits):
+        return None
+    month = digits[-4:-2]
+    if not 1 <= int(month) <= 12:
+        return None
+    plan = digits[:-4].lstrip("0") or "0"
+    return plan, digits[-2:]
+
+
+def _plan_id_signature_with_month(value: str) -> tuple[str, str, str] | None:
+    digits = re.sub(r"[^0-9]", "", str(value))
+    if not re.fullmatch(r"\d{6,8}", digits):
+        return None
+    month = digits[-4:-2]
+    if not 1 <= int(month) <= 12:
+        return None
+    plan = digits[:-4].lstrip("0") or "0"
+    return plan, month, digits[-2:]
+
+
+def _normalize_plan_id(value: str) -> str:
+    digits = re.sub(r"[^0-9]", "", str(value))
+    return digits.lstrip("0") or digits
+
+
+def _plan_ids_match(left: str, right: str) -> bool:
+    left_signature = _plan_id_signature(left)
+    right_signature = _plan_id_signature(right)
+    if left_signature and right_signature:
+        return left_signature == right_signature
+    return _normalize_plan_id(left) == _normalize_plan_id(right)
+
+
+def _plan_ids_match_same_month(left: str, right: str) -> bool:
+    left_signature = _plan_id_signature_with_month(left)
+    right_signature = _plan_id_signature_with_month(right)
+    return bool(left_signature and right_signature and left_signature == right_signature)
 
 
 def extract_blast_datetime(
@@ -370,8 +404,8 @@ def extract_blast_datetime(
     allow_unmatched_plan_fallback: bool = False,
 ) -> tuple[str, str]:
     if plan_id:
-        plan_patterns = _plan_id_search_patterns(plan_id)
         event_pattern = re.compile(r"\[(BlastingPlan|Fire)\](\d{4}/\d{2}/\d{2})-(\d{2}:\d{2}:\d{2})")
+        matches: list[tuple[str, str, str, str, str]] = []
         for file in sorted(histo_files, key=lambda item: item.stat().st_mtime, reverse=True):
             text = read_text(file)
             events = list(event_pattern.finditer(text))
@@ -380,11 +414,23 @@ def extract_blast_datetime(
                     continue
                 next_event_start = events[index + 1].start() if index + 1 < len(events) else len(text)
                 block = text[event.start():next_event_start]
-                if not any(pattern.search(block) for pattern in plan_patterns):
+                block_plan_ids = _PLAN_ID_PATTERN.findall(block)
+                matching_plan_ids = [candidate for candidate in block_plan_ids if _plan_ids_match(plan_id, candidate)]
+                if not matching_plan_ids:
                     continue
                 for follow_event in events[index + 1:]:
                     if follow_event.group(1) == "Fire":
-                        return _format_histo_datetime(follow_event.group(2), follow_event.group(3))
+                        matches.append((matching_plan_ids[0], follow_event.group(2), follow_event.group(3), file.name, str(event.start())))
+                        break
+
+        same_month_matches = [match for match in matches if _plan_ids_match_same_month(plan_id, match[0])]
+        viable_matches = same_month_matches or matches
+        if len(viable_matches) > 1:
+            candidates = ", ".join(f"{match[0]} ({match[1]}-{match[2]})" for match in viable_matches)
+            raise ValueError(f"Foram encontrados múltiplos blocos [BlastingPlan] compatíveis com o plano {plan_id}: {candidates}.")
+        if viable_matches:
+            _, date_str, time_str, _, _ = viable_matches[0]
+            return _format_histo_datetime(date_str, time_str)
 
         if not allow_unmatched_plan_fallback:
             raise ValueError(f"Não foi encontrado no HISTO um disparo associado ao plano {plan_id}.")

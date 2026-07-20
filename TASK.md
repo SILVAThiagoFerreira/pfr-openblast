@@ -5,6 +5,8 @@ Reestruturar o gerador de plano de fogo em uma base modular, configurável e val
 Regras operacionais atuais:
 - O plano operacional pode ser fixado em `business.fallback_plan_id` quando a extracao automatica puder capturar IDs de detonadores ou eventos de teste.
 - Se o PDF e o HISTO representarem o mesmo plano com e sem zero à esquerda, o sistema deve tratar as duas formas como equivalentes para resolver o bloco correto e o nome da saida.
+- IDs devem ser interpretados como `PLANO;MÊS;ANO`: o mesmo plano e ano devem localizar o bloco correto mesmo quando o mês do PDF/arquivos for diferente do mês da detonação; o mês não deve ser usado como igualdade estrita.
+- Se houver mais de um bloco do mesmo plano e ano, priorizar o mês coincidente; sem candidato único, falhar explicitamente por ambiguidade.
 - A data/hora do disparo deve ser o primeiro `[Fire]` posterior ao `[BlastingPlan]` que contem o plano correto, nunca o ultimo `[Fire]` do arquivo inteiro.
 - `DetonatingTime` vazio é preenchido por interpolação linear determinística na sequência ordenada por `Number`.
 - `DetonatingTime` imputado é arredondado para inteiro, sem casas decimais.
@@ -23,4 +25,4 @@ Critério objetivo de conclusão:
 
 ## Atualização do modo online
 - Permitir inclusão e remoção incremental de anexos sem reiniciar a seleção.
-- Reconhecer variações do ID do plano no HISTO, no nome do arquivo e nas tabelas, incluindo zeros à esquerda e separadores.
+- Reconhecer variações do ID do plano no HISTO, no nome do arquivo e nas tabelas, incluindo zeros à esquerda, separadores e meses diferentes para o mesmo plano/ano, com bloqueio de ambiguidades.

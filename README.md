@@ -52,7 +52,7 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`.
 
 ## Regra de plano e horario
-Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. A data/hora do disparo e extraida do `HISTO-*.txt` pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` que contem esse plano. Quando o PDF trouxer o plano com zero à esquerda e o `HISTO` registrar a mesma frente sem esse zero, o sistema trata as duas formas como equivalentes.
+Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.
 
 Exemplo validado:
 - Plano: `320526`
@@ -70,4 +70,4 @@ Quando `business.enforce_charge_total_target` estiver habilitado, o total de `ca
 - `tests/` contém testes de fumaça e validação básica.
 
 ## Anexos no modo online
-Os arquivos podem ser adicionados em várias seleções ou arrastados em momentos diferentes. A lista mantém os anexos já carregados, permite remover cada item individualmente e só então iniciar a validação. A identificação do plano usa também os IDs encontrados nas tabelas e no nome dos arquivos, comparando-os com o HISTO após normalizar zeros à esquerda e separadores comuns.
+Os arquivos podem ser adicionados em várias seleções ou arrastados em momentos diferentes. A lista mantém os anexos já carregados, permite remover cada item individualmente e só então iniciar a validação. A identificação do plano usa também os IDs encontrados nas tabelas e no nome dos arquivos, comparando plano e ano com o HISTO após normalizar zeros à esquerda e separadores comuns, sem bloquear por mês diferente.

@@ -87,6 +87,48 @@ DBD0233;97
         self.assertEqual(blast_date, "13/05/2026")
         self.assertEqual(blast_time, "12:01:43")
 
+    def test_blast_datetime_allows_detonation_month_to_differ_from_plan_month(self):
+        history = """[BlastingPlan]2026/07/16-12:29:07;84;+34.3
+ PU48;368;1853;PP290726;A;2;2;1;PP290726_D _ TEMPORIZACAO
+-
+[Fire]2026/07/16-12:32:49;83;+33.5
+"""
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "HISTO-TESTE.txt"
+            path.write_text(history, encoding="utf-8")
+            blast_date, blast_time = extract_blast_datetime((path,), "290426")
+
+        self.assertEqual(blast_date, "16/07/2026")
+        self.assertEqual(blast_time, "12:32:49")
+
+    def test_blast_datetime_does_not_match_a_different_plan_number(self):
+        history = """[BlastingPlan]2026/07/16-12:29:06;84;+34.3
+ PU2759;257;563BC;PP400726;A;2;3;1;PP400726
+-
+[Fire]2026/07/16-12:32:49;83;+33.5
+"""
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "HISTO-TESTE.txt"
+            path.write_text(history, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "(?i)não foi encontrado.*290426"):
+                extract_blast_datetime((path,), "290426")
+
+    def test_blast_datetime_rejects_multiple_compatible_blocks(self):
+        history = """[BlastingPlan]2026/07/16-12:29:06;84;+34.3
+ PU48;368;1853;PP290726;A;2;2;1;PP290726
+-
+[Fire]2026/07/16-12:32:49;83;+33.5
+[BlastingPlan]2026/07/16-13:29:06;84;+34.3
+ PU49;368;1854;PP290726;A;2;2;1;PP290726
+-
+[Fire]2026/07/16-13:32:49;83;+33.5
+"""
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "HISTO-TESTE.txt"
+            path.write_text(history, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "(?i)múltiplos blocos"):
+                extract_blast_datetime((path,), "290426")
+
     def test_missing_detonating_time_is_interpolated(self):
         cfg = normalize_config(load_config(ROOT / "config.yaml"), ROOT)
         merged = pd.DataFrame(

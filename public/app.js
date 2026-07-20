@@ -157,14 +157,7 @@ function decodeText(bytes) {
   return utf8.includes('\uFFFD') ? new TextDecoder('windows-1252').decode(bytes) : utf8;
 }
 
-function normalizePlanId(value) {
-  const digits = String(value ?? '').replace(/[^0-9]/g, '');
-  return digits ? digits.replace(/^0+(?=\d)/, '') : '';
-}
-
-function extractPlanIds(value) {
-  return [...String(value ?? '').matchAll(/\bPP(?:[\s._/-]*\d){6,8}\b/gi)].map(match => match[0]);
-}
+const { extractPlanIds, normalizePlanId, resolvePlanAndFire } = window.OpenBlastPlanId;
 
 function sourcePlanHints(files, parsedTables) {
   const hints = [];
@@ -202,60 +195,6 @@ async function findSources(files) {
   const pdfHeader = decodeText(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
   if (!pdfHeader.startsWith('%PDF-')) throw new Error(`O arquivo ${pdf.name} não parece ser um PDF válido.`);
   return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry.text, pdf, planHints: sourcePlanHints(files, parsedTables) };
-}
-
-function formatDate(date) {
-  const [year, month, day] = date.split('/');
-  return `${day}/${month}/${year}`;
-}
-
-function extractPlanAndFire(text) {
-  const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
-  const events = [...text.matchAll(eventRegex)];
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index];
-    if (event[1] !== 'BlastingPlan') continue;
-    const end = index + 1 < events.length ? events[index + 1].index : text.length;
-    const block = text.slice(event.index, end);
-    const blockPlans = extractPlanIds(block).map(normalizePlanId);
-    const planId = blockPlans[blockPlans.length - 1];
-    if (!planId) continue;
-    const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
-    if (fire) return { planId, date: formatDate(fire[2]), time: fire[3] };
-  }
-  const plans = extractPlanIds(text).map(normalizePlanId);
-  const planId = [...new Set(plans)].pop();
-  if (!planId) throw new Error('Não foi possível identificar o plano no HISTO.');
-  const fires = events.filter(event => event[1] === 'Fire');
-  if (!fires.length) throw new Error('Não foi encontrado nenhum evento [Fire] válido no HISTO.');
-  const fire = fires[fires.length - 1];
-  return { planId, date: formatDate(fire[2]), time: fire[3] };
-}
-
-function extractPlanAndFireForSources(text, hints) {
-  const normalizedHints = new Set(hints);
-  const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
-  const events = [...text.matchAll(eventRegex)];
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index][1] !== 'BlastingPlan') continue;
-    const end = index + 1 < events.length ? events[index + 1].index : text.length;
-    const block = text.slice(events[index].index, end);
-    const candidates = extractPlanIds(block).map(normalizePlanId);
-    const matchingPlan = candidates.find(planId => normalizedHints.has(planId));
-    const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
-    if (matchingPlan && fire) return { planId: matchingPlan, date: formatDate(fire[2]), time: fire[3] };
-  }
-  const histoPlanIds = [...new Set(extractPlanIds(text).map(normalizePlanId).filter(Boolean))];
-  const fires = events.filter(event => event[1] === 'Fire');
-  if (!histoPlanIds.length && normalizedHints.size && fires.length) {
-    const planId = [...normalizedHints][0];
-    const fire = fires[fires.length - 1];
-    return { planId, date: formatDate(fire[2]), time: fire[3] };
-  }
-  if (normalizedHints.size && histoPlanIds.length) {
-    throw new Error(`O plano dos anexos (${[...normalizedHints].join(', ')}) não foi encontrado no HISTO. IDs encontrados: ${histoPlanIds.join(', ')}.`);
-  }
-  return extractPlanAndFire(text);
 }
 
 function uniqueSequence(lower, upper, count, forbidden) {
@@ -391,7 +330,7 @@ async function generateLocally(files) {
   const { projectRows, finalRows, histoText, planHints } = sources;
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
-  const event = extractPlanAndFireForSources(histoText, planHints);
+  const event = resolvePlanAndFire(histoText, planHints);
   setProgress(62, 'Montando os dados dos furos...');
   const data = await buildRows(projectRows, finalRows, event);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
