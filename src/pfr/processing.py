@@ -327,24 +327,68 @@ def _enforce_charge_total_target(
     return result, True
 
 
-def extract_plan_id(plan_pdf: Path | None, histo_files: tuple[Path, ...], cfg: dict) -> str:
+def _extract_plan_id_from_input_files(cfg: dict, sources) -> str | None:
+    filenames: list[str] = []
+    for attr in ("plan_pdf", "project", "final"):
+        path = getattr(sources, attr, None)
+        if path is not None:
+            name = path.name if hasattr(path, "name") else Path(str(path)).name
+            if name:
+                filenames.append(name)
+    input_root = cfg.get("paths", {}).get("input_root")
+    if input_root:
+        try:
+            for entry in Path(input_root).iterdir():
+                if entry.is_file():
+                    filenames.append(entry.name)
+        except OSError:
+            pass
+    candidates: list[str] = []
+    for filename in filenames:
+        matches = _PLAN_ID_PATTERN.findall(filename)
+        for match in matches:
+            if match not in candidates:
+                candidates.append(match)
+    if not candidates:
+        return None
+    pdf_name = sources.plan_pdf.name if sources.plan_pdf and hasattr(sources.plan_pdf, "name") else ""
+    for candidate in candidates:
+        if pdf_name and candidate in pdf_name:
+            plan_id = candidate[2:] if candidate.upper().startswith("PP") else candidate
+            return plan_id
+    plan_id = candidates[0][2:] if candidates[0].upper().startswith("PP") else candidates[0]
+    return plan_id
+
+
+def extract_plan_id(plan_pdf: Path | None, histo_files: tuple[Path, ...], cfg: dict, sources=None) -> str:
     business = cfg.get("business", {})
     source = str(business.get("plan_id_source", "auto")).strip().lower()
     fallback = str(business.get("fallback_plan_id", "")).strip()
     if source == "fallback":
         if not fallback:
             raise ValueError("business.fallback_plan_id deve ser informado quando plan_id_source=fallback.")
-        return fallback
+        candidate = _extract_plan_id_from_input_files(cfg, sources) if sources else None
+        return candidate if candidate else fallback
     regex = re.compile(cfg["business"]["plan_id_regex"])
     if plan_pdf and plan_pdf.exists():
-        text = " ".join(page.extract_text() or "" for page in PdfReader(str(plan_pdf)).pages)
-        match = regex.search(text)
-        if match:
-            return match.group(1)
+        try:
+            text = " ".join(page.extract_text() or "" for page in PdfReader(str(plan_pdf)).pages)
+            match = regex.search(text)
+            if match:
+                return match.group(1)
+        except Exception:
+            pass
     for histo in histo_files:
-        match = regex.search(read_text(histo))
-        if match:
-            return match.group(1)
+        try:
+            match = regex.search(read_text(histo))
+            if match:
+                return match.group(1)
+        except Exception:
+            pass
+    if sources:
+        candidate = _extract_plan_id_from_input_files(cfg, sources)
+        if candidate:
+            return candidate
     if fallback:
         return fallback
     raise ValueError("Não foi possível identificar o ID do plano nos anexos e não há fallback configurado.")

@@ -18,14 +18,15 @@ inputs:
       - "*CONFIG FINAL*.xlsx"
       - "*CONFIG FINAL*.xlsm"
     plan_pdf_patterns:
+      - "PP*.pdf"
       - "PP.pdf"
     histo_patterns:
       - "HISTO-*.txt"
 
 business:
   output_type_label: "producao"
-  plan_id_source: "fallback"
-  plan_id_regex: "^NAO_EXTRAIR_ID_DO_ARQUIVO$"
+  plan_id_source: "auto"
+  plan_id_regex: "(?:pp)?(\\d{6,8}(?:[_-][A-Z])?)"
   fallback_plan_id: "TESTE"
   redistribute_zero_charges: true
   charge_total_target_kg: 511.0

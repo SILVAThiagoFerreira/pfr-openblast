@@ -16,6 +16,17 @@ def find_first(root: Path, patterns: list[str]) -> Path | None:
     return None
 
 
+def find_all(root: Path, patterns: list[str]) -> list[Path]:
+    entries = [path for path in root.iterdir() if path.is_file()]
+    results = []
+    for pattern in patterns:
+        results.extend(
+            path for path in entries
+            if fnmatch(path.name.lower(), pattern.lower())
+        )
+    return sorted(set(results), key=lambda path: path.name.lower())
+
+
 def discover_sources(cfg: dict) -> SourceFiles:
     input_root = cfg["paths"]["input_root"]
     pp = cfg["inputs"]["pp"]

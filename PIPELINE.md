@@ -2,10 +2,10 @@
 
 1. Carregar configuração.
 2. Resolver caminhos absolutos.
-3. Descobrir arquivos de entrada em `input/`.
+3. Descobrir arquivos de entrada em `input/` usando padrões flexíveis (`PP*.pdf`, `*PROJETO COMPLETO*`, `*CONFIG FINAL*`).
 4. Validar presença e colunas mínimas.
 5. Gerar backup dos insumos.
-6. Resolver ID do plano conforme `config.yaml`; quando houver risco de capturar ID de detonador, usar `business.fallback_plan_id`. Interpretar o ID como `PLANO;MÊS;ANO`: comparar o mesmo plano e ano, ignorando o mês para permitir que a emissão e a detonação ocorram em meses diferentes.
+6. Resolver ID do plano em múltiplas fontes: (a) regex configurado no conteúdo do PDF, (b) regex configurado no conteúdo do HISTO, (c) padrão PP nos nomes dos arquivos de entrada, (d) `business.fallback_plan_id`. A primeira fonte que produzir um ID válido é utilizada. Interpretar o ID como `PLANO;MÊS;ANO`: comparar o mesmo plano e ano, ignorando o mês para permitir que a emissão e a detonação ocorram em meses diferentes. Pequenas variações nos nomes (zeros à esquerda, sufixos, separadores) são normalizadas automaticamente.
 7. Extrair data e hora do disparo pelo primeiro `[Fire]` posterior ao `[BlastingPlan]` que contém o plano resolvido, considerando zeros à esquerda, separadores e mês de emissão diferente do mês de detonação.
 8. Se houver mais de um bloco compatível, priorizar mês coincidente; se a ambiguidade permanecer, interromper e listar os candidatos, sem escolher um bloco arbitrariamente.
 9. Ler o projeto e o realizado.

@@ -4,13 +4,13 @@
 Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP, com validação prévia, backup e rastreabilidade.
 
 ## Entradas
-- Projeto: `OPIT-PP*PROJETO COMPLETO*`
-- Realizado: `OPIT-PP*CONFIG FINAL*`
-- Plano PDF: `PP.pdf`
+- Projeto: `*PROJETO COMPLETO*`
+- Realizado: `*CONFIG FINAL*`
+- Plano PDF: `PP*.pdf` ou `PP.pdf`
 - Histórico: `HISTO-*.txt`
 
 ## Regras
-- O ID do plano deve ser resolvido de forma auditável. Quando a extração automática puder confundir IDs de detonadores, usar `business.plan_id_source: "fallback"` e registrar o plano correto em `business.fallback_plan_id`.
+- O ID do plano deve ser resolvido de forma auditável. O sistema tenta extrair o ID nesta ordem: (1) regex configurado no conteúdo do PDF, (2) regex configurado no conteúdo do HISTO, (3) padrão PP nos nomes dos arquivos de entrada, (4) `business.fallback_plan_id`. O modo `"auto"` habilita todas as fontes; o modo `"fallback"` usa apenas nomes de arquivo e fallback.
 - Quando o PDF trouxer o plano com zero à esquerda e o HISTO registrar a mesma frente sem esse zero, o sistema deve tratar as duas formas como equivalentes para localizar o bloco operacional correto e nomear a saída pelo ID resolvido.
 - O ID segue a composição `PP<PLANO><MÊS><ANO>`: os quatro últimos dígitos representam mês e ano, e os dígitos anteriores representam o plano. Para localizar o bloco no HISTO, o mês pode ser diferente entre o PDF/arquivos e a detonação; a comparação exige o mesmo plano e ano, ignorando apenas o mês. O ID do evento encontrado no HISTO permanece como o identificador da execução.
 - Se mais de um bloco `[BlastingPlan]` for compatível com o mesmo plano e ano, priorizar o bloco cujo mês coincida com o ID de origem; permanecendo mais de um candidato, abortar com erro explícito de ambiguidade.
@@ -38,6 +38,8 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 
 ## Identificação pública do plano
 No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`. O prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade do plano. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que tenha o mesmo plano e ano das pistas dos arquivos/tabelas anexados, mesmo quando o mês de emissão for diferente do mês da detonação.
+
+O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado.
 
 ## Determinismo
 - Ordenação por `Number`.

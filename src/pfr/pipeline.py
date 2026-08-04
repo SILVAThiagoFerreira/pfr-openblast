@@ -44,7 +44,7 @@ def run(config_path: Path) -> RunResult:
     validate_sources(sources, cfg)
     backup_inputs([sources.project, sources.final, sources.plan_pdf, *sources.histo_files], cfg["paths"]["backup_root"])
 
-    plan_id = extract_plan_id(sources.plan_pdf, sources.histo_files, cfg)
+    plan_id = extract_plan_id(sources.plan_pdf, sources.histo_files, cfg, sources)
     blast_date, blast_time = extract_blast_datetime(
         sources.histo_files,
         plan_id,
