@@ -307,14 +307,10 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
 function buildWorkbook(data, sources, event, chargeOptions = {}) {
   const sheet = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLUMNS });
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
-  const totalDepth = data.reduce((sum, row) => sum + (row['profundidade realizada'] ?? 0), 0);
-  const totalCharge = data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0);
   const summaryRows = [
-    ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time], ['Total de furos', data.length],
-    ['Profundidade total (m)', Math.round(totalDepth * 100) / 100], ['Carga total (kg)', Math.round(totalCharge * 100) / 100],
-    ['Arquivo projeto', sources.project.name], ['Arquivo realizado', sources.final.name], ['Arquivo PDF', sources.pdf.name]
+    ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time]
   ];
-  if (chargeOptions.enabled) summaryRows.splice(7, 0, ['Carga-alvo aplicado (kg)', chargeOptions.target]);
+  if (chargeOptions.enabled) summaryRows.push(['Carga-alvo aplicado (kg)', chargeOptions.target]);
   const summary = XLSX.utils.aoa_to_sheet(summaryRows);
   summary['!cols'] = [{ wch: 28 }, { wch: 42 }];
   const workbook = XLSX.utils.book_new();

@@ -607,11 +607,6 @@ def build_summary(merged: pd.DataFrame, data: pd.DataFrame, plan_id: str, blast_
         ["Plano", plan_id],
         ["Data", blast_date],
         ["Hora", blast_time],
-        ["Total de furos", int(len(data))],
-        ["Profundidade total (m)", round(float(pd.to_numeric(data["profundidade realizada"], errors="coerce").sum()), 2)],
-        ["Carga total (kg)", round(float(pd.to_numeric(data["cargas realizadas"], errors="coerce").sum()), 2)],
-        ["Arquivo projeto", sources["project"].name],
-        ["Arquivo realizado", sources["final"].name],
-        ["Arquivo PDF", sources["plan_pdf"].name if sources["plan_pdf"] else "-"],
+
     ]
     return pd.DataFrame(rows, columns=["Campo", "Valor"])
