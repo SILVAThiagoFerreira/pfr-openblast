@@ -52,6 +52,9 @@
   }
 
   function convertEvent(event, targetOffset, sourceOffset = '+00:00') {
+    if (event?.timeSource === 'manual' || event?.timeSource === 'force-default') {
+      return { ...event, timezoneOffset: null };
+    }
     const targetMinutes = parseOffset(targetOffset);
     if (targetMinutes === null) return { ...event, timezoneOffset: null };
     const sourceMinutes = parseOffset(sourceOffset) ?? 0;

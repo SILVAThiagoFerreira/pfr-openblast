@@ -22,6 +22,12 @@ assert.deepEqual(JSON.parse(JSON.stringify(timezone.convertEvent({ date: '16/07/
   planId: '290726',
   timezoneOffset: null
 });
+assert.deepEqual(JSON.parse(JSON.stringify(timezone.convertEvent({ date: '04/08/2026', time: '12:00:00', timeSource: 'force-default' }, '-03:00'))), {
+  date: '04/08/2026',
+  time: '12:00:00',
+  timeSource: 'force-default',
+  timezoneOffset: null
+});
 
 for (const root of [publicRoot, docsRoot]) {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
