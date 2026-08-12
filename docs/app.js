@@ -382,7 +382,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
 async function runGeneration(force = false) {
   if (!attachedFiles.length) return;
   const planIdentity = readPlanIdentity();
-  button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
+  button.disabled = true; if (forceButton) forceButton.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
     const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() }, { force, planIdentity });
     setProgress(88, 'Gerando o arquivo Excel...');

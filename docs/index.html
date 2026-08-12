@@ -76,8 +76,8 @@
       </fieldset>
       <div class="generation-actions">
         <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
-        <button id="force-submit" class="force-submit" type="button" title="Forçar execução" disabled>Forçar execução <span>→</span></button>
-        <p class="field-help force-help">Use somente quando a diferença do ID for explicada pela mudança do mês do projeto para o mês do desmonte. As outras validações permanecem obrigatórias.</p>
+        <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span>→</span></button>
+        <p id="force-help" class="field-help force-help">Use somente quando a diferença do ID for explicada pela mudança do mês do projeto para o mês do desmonte. As outras validações permanecem obrigatórias.</p>
       </div>
       <div id="progress" class="progress" hidden aria-live="polite"><div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
     </form>
