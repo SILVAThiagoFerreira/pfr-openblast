@@ -31,6 +31,9 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /value="-03:00"/);
   assert.match(html, /id="plan-identity"/);
   assert.match(html, /for="plan-identity"[^>]*>ID \/ nome do plano de fogo em trabalho/);
+  assert.match(html, /id="manual-fire-time"/);
+  assert.match(html, /for="manual-fire-time"[^>]*>Horário local do desmonte/);
+  assert.match(html, /id="manual-fire-time-error"/);
   assert.match(html, /id="force-submit"[^>]*>Forçar execução/);
   assert.match(html, /force-execution\.css/);
   assert.match(html, /\.\/modelos\/modelo-pre-corte-sem-furos\.xlsx/);
@@ -41,6 +44,9 @@ for (const root of [publicRoot, docsRoot]) {
   assert.equal(fs.existsSync(path.join(root, 'modelos', 'modelo-producao.xls')), true);
   assert.equal(fs.existsSync(path.join(root, 'force-execution.css')), true);
   assert.match(app, /parseManualPlanId/);
+  assert.match(app, /manualFireTime/);
+  assert.match(app, /12:00:00/);
+  assert.match(app, /MISSING_FIRE_TIME/);
   assert.match(app, /runGeneration\(true\)/);
 }
 

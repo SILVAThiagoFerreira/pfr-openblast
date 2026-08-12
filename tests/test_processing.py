@@ -122,6 +122,31 @@ BMO352:
         self.assertEqual(blast_date, "01/01/2026")
         self.assertEqual(blast_time, "22:02:03")
 
+    def test_dbd_log_inherits_date_for_time_only_fire_and_blastplan(self):
+        history = """[HistoryStart] 2026/08/04-10:19:50
+-
+[BlastPlan] 14:52:32
+ PU588;012604;117037236398154;227
+-
+[StartProcedure] 15:02:51;56;33.6°C
+-
+[Fire] 15:05:22;56;32.3°C
+-
+[FireDone] 15:05:53;56;32.4°C
+Result: OK
+"""
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "BMO-0352_history_DBD.log"
+            path.write_text(history, encoding="utf-8")
+            blast_date, blast_time = extract_blast_datetime(
+                (path,),
+                "440726",
+                allow_unmatched_plan_fallback=True,
+            )
+
+        self.assertEqual(blast_date, "04/08/2026")
+        self.assertEqual(blast_time, "15:05:22")
+
     def test_fallback_plan_id_is_not_extracted_from_pdf(self):
         cfg = normalize_config(load_config(ROOT / "config.yaml"), ROOT)
         with TemporaryDirectory() as tmp:

@@ -420,7 +420,8 @@ class _HistoEvent:
 
 _HISTO_EVENT_PATTERN = re.compile(
     r"(?m)^[ \t]*\[(?P<name>[^\]\r\n]+)\][ \t]*"
-    r"(?P<date>\d{4}/\d{1,2}/\d{1,2})-(?P<time>\d{1,2}:\d{1,2}:\d{1,2})[^\r\n]*"
+    r"(?:(?P<date>\d{4}/\d{1,2}/\d{1,2})-)?"
+    r"(?P<time>\d{1,2}:\d{1,2}:\d{1,2})?[^\r\n]*"
 )
 
 
@@ -466,20 +467,35 @@ def _parse_histo_events(path: Path) -> list[_HistoEvent]:
     text = read_text(path)
     headers = list(_HISTO_EVENT_PATTERN.finditer(text))
     events: list[_HistoEvent] = []
+    current_date = ""
     for index, header in enumerate(headers):
+        explicit_date = header.group("date")
+        if explicit_date:
+            try:
+                current_date = datetime.strptime(explicit_date, "%Y/%m/%d").strftime("%Y/%m/%d")
+            except ValueError:
+                current_date = ""
+        raw_time = header.group("time")
+        if not raw_time or not current_date:
+            continue
         try:
+            date = current_date
+            time = datetime.strptime(raw_time, "%H:%M:%S").strftime("%H:%M:%S")
             timestamp = datetime.strptime(
-                f"{header.group('date')}-{header.group('time')}",
+                f"{date}-{time}",
                 "%Y/%m/%d-%H:%M:%S",
             )
         except ValueError:
             continue
+        name = header.group("name").strip()
+        if name.casefold() == "blastplan":
+            name = "BlastingPlan"
         body_end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
         events.append(
             _HistoEvent(
-                name=header.group("name").strip(),
-                date=header.group("date"),
-                time=header.group("time"),
+                name=name,
+                date=date,
+                time=time,
                 timestamp=timestamp,
                 body=text[header.end():body_end],
                 file=path,

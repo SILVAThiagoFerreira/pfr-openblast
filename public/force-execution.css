@@ -3,6 +3,12 @@
 .plan-identity-settings label{display:block;color:var(--gray);font-size:13px;font-weight:700;margin-bottom:7px}
 .plan-identity-settings input{width:100%;max-width:470px;height:44px;border:1px solid #aeb7bd;padding:0 12px;color:var(--ink);font:inherit;background:var(--white)}
 .plan-identity-settings input:focus{outline:2px solid rgba(226,6,19,.22);outline-offset:1px;border-color:var(--red)}
+.fire-time-settings{margin:4px 0 14px;border:1px solid var(--line);padding:18px;background:#fbfcfc}
+.fire-time-settings legend{padding:0 7px;color:var(--gray);font-size:12px;font-weight:700;letter-spacing:.04em}
+.fire-time-settings label{display:block;color:var(--gray);font-size:13px;font-weight:700;margin-bottom:7px}
+.fire-time-settings input{width:100%;max-width:220px;height:44px;border:1px solid #aeb7bd;padding:0 12px;color:var(--ink);font:inherit;background:var(--white)}
+.fire-time-settings input:focus{outline:2px solid rgba(226,6,19,.22);outline-offset:1px;border-color:var(--red)}
+.fire-time-settings input[aria-invalid="true"]{border-color:var(--red);background:#fff7f7}
 .generation-actions{margin-top:4px}
 .generation-actions button+button{margin-top:10px}
 .force-submit{background:var(--gray)}

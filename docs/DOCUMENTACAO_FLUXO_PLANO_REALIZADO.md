@@ -151,9 +151,10 @@ Uso principal:
 
 Regra atual:
 
-- usar o primeiro evento `[Fire]` do bloco compatível; no novo padrão, o bloco é aberto por `[StartProcedure]` e identificado por `BP:`
-- aplicar o offset de fuso escolhido pelo usuário, quando informado (por exemplo, `-03:00`)
-- se nao houver log ou nao houver evento valido, usar `12:00:00`
+- usar o primeiro evento `[Fire]` do bloco compatível; o parser aceita `[BlastingPlan]` e `[BlastPlan]`, além de cabeçalhos com data completa ou somente `HH:MM:SS`
+- quando o cabeçalho traz somente o horário, herdar a última data completa do histórico
+- aplicar o offset de fuso escolhido pelo usuário somente ao horário lido do HISTO
+- se o horário não for identificável, solicitar o horário local; na execução forçada sem preenchimento, usar `12:00:00` local
 
 ### 7. Template Excel `.xls`
 
@@ -257,11 +258,13 @@ Funcao:
 Regra atual:
 
 - procura arquivos `HISTO-*.txt`, `HISTO-*.log` ou `*_histo.log`
-- busca o primeiro evento `[Fire]YYYY/MM/DD-HH:MM:SS` no bloco `[BlastingPlan]` ou `[StartProcedure]` compatível
-- reconhece espaços após `]` e linhas `BP:` no novo `.log`
+- busca o primeiro evento `[Fire]` no bloco `[BlastingPlan]`/`[BlastPlan]` ou `[StartProcedure]` compatível
+- reconhece espaços após `]`, linhas `BP:` e horários `HH:MM:SS` no novo `.log`
+- herda a data do último cabeçalho completo (`[HistoryStart]`, `[PowerOn]` etc.)
 - usa a hora extraida como horario oficial do desmonte
-- converte o horário pelo offset selecionado antes de montar o Excel
-- fallback: `12:00:00`
+- converte o horário lido pelo offset selecionado antes de montar o Excel
+- horário manual: usado como horário local sem nova conversão
+- fallback da execução forçada: `12:00:00` local, registrado como sintético no resumo
 
 ### 6. Extrai texto do PDF de perfuracao
 
@@ -678,7 +681,7 @@ Isso significa que alguns indicadores nao sao 100 por cento oriundos de uma unic
 - `Burden` e `Spacing` do CSV ID = `previsto.csv`
 - `X`, `Y`, `Z`, `Angle`, `Azimuth` do CSV ID = `pp.xlsx`
 - `DetonatingTime` do CSV ID = `previsto.csv`, com inferencia para faltantes
-- horario do desmonte = primeiro `[Fire]` do log `HISTO-*.txt` ou `*_histo.log`, com conversão de fuso opcional
+- horario do desmonte = primeiro `[Fire]` do log `HISTO-*.txt`, `*_histo.log` ou `BMO-*_history_DBD.log`, com data contextual e conversão de fuso opcional
 - furo da capa = escolha aleatoria entre furos do plano final
 - `Data:` do cabecalho = sem hora
 

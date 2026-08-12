@@ -16,6 +16,8 @@ const chargeTargetInput = document.querySelector('#charge-target-input');
 const chargeTargetError = document.querySelector('#charge-target-error');
 const timezoneOffset = document.querySelector('#timezone-offset');
 const planIdentityInput = document.querySelector('#plan-identity');
+const manualFireTimeInput = document.querySelector('#manual-fire-time');
+const manualFireTimeError = document.querySelector('#manual-fire-time-error');
 const forceButton = document.querySelector('#force-submit');
 let attachedFiles = [];
 
@@ -104,7 +106,8 @@ function makeClientLog(error, options = {}) {
   const files = [...input.files].map(file => file.name).join('\n') || '-';
   const offset = timezoneOffset?.value || 'none';
   const identity = options.planIdentity?.raw || '-';
-  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+  const fireTime = options.manualFireTime || '-';
+  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nHorário local informado: ${fireTime}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
 function setProgress(value, label) {
@@ -166,6 +169,30 @@ function readTimezoneOffset() {
 function readPlanIdentity() {
   const raw = planIdentityInput?.value.trim() || '';
   return { raw, manualPlanId: window.OpenBlastPlanId.parseManualPlanId(raw) };
+}
+
+function setManualFireTimeError(message = '') {
+  if (!manualFireTimeError || !manualFireTimeInput) return;
+  manualFireTimeError.textContent = message;
+  manualFireTimeError.hidden = !message;
+  manualFireTimeInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function readManualFireTime() {
+  const raw = manualFireTimeInput?.value.trim() || '';
+  if (!raw) {
+    setManualFireTimeError();
+    return '';
+  }
+  const normalized = window.OpenBlastPlanId.normalizeFireTime(raw);
+  if (!normalized) {
+    setManualFireTimeError('Use um horário válido no formato HH:MM ou HH:MM:SS.');
+    const error = new Error('O horário informado é inválido. Use o formato HH:MM ou HH:MM:SS.');
+    error.code = 'INVALID_FIRE_TIME';
+    throw error;
+  }
+  setManualFireTimeError();
+  return normalized;
 }
 
 chargeTargetToggle.addEventListener('change', syncChargeTargetControls);
@@ -239,7 +266,7 @@ async function findSources(files) {
   const textCandidates = await Promise.all(textFiles.map(async file => ({ file, text: decodeText(new Uint8Array(await file.arrayBuffer())) })));
   const histoEntry = textCandidates.find(item => /^HISTO-.*\.(?:txt|log)$/i.test(item.file.name))
     || textCandidates.find(item => /histo|historial.*drb/i.test(item.file.name))
-    || textCandidates.find(item => /\[Fire\]\d{4}\/\d{2}\/\d{2}-\d{2}:\d{2}:\d{2}/.test(item.text));
+    || textCandidates.find(item => /\[\s*Fire\s*\][ \t]*(?:(?:\d{4}\/\d{1,2}\/\d{1,2}-)?\d{1,2}:\d{2}:\d{2})/i.test(item.text));
   const histo = histoEntry?.file;
   const pdf = files.find(file => /\.pdf$/i.test(file.name));
   if (!projectEntry || !finalEntry) throw new Error('Não foi possível identificar as tabelas. Confira se uma contém as colunas do projeto e outra as colunas do realizado.');
@@ -330,7 +357,8 @@ function buildWorkbook(data, sources, event, chargeOptions = {}) {
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
   const summaryRows = [
     ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time],
-    ['Fuso horário', event.timezoneOffset || 'Horário original do HISTO'],
+    ['Fuso horário', event.timezoneOffset || (event.timeSource ? 'Não convertido — horário local informado' : 'Horário original do HISTO')],
+    ['Fonte do horário', event.timeSource === 'force-default' ? 'Fallback da execução forçada — 12:00:00' : event.timeSource === 'manual' ? 'Horário informado pelo usuário' : 'HISTO'],
     ['Modo de execução', event.forced ? 'Forçada' : 'Validação automática']
   ];
   if (event.planIdentity) summaryRows.push(['Identificação informada', event.planIdentity]);
@@ -357,15 +385,20 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
   const planIdentity = planOptions.planIdentity || {};
+  const manualFireTime = planOptions.manualFireTime || '';
   const resolvedEvent = resolvePlanAndFire(histoText, planHints, {
     force: Boolean(planOptions.force),
-    manualPlanId: planIdentity.manualPlanId
+    manualPlanId: planIdentity.manualPlanId,
+    manualFireTime
   });
+  // O horário digitado e o fallback 12:00:00 já representam o horário local
+  // do desmonte. Apenas horários lidos do HISTO passam pela conversão de fuso.
+  const eventTimezoneOffset = resolvedEvent.timeSource ? null : timeOptions.timezoneOffset;
   const event = window.OpenBlastTimezone.convertEvent({
     ...resolvedEvent,
     forced: Boolean(planOptions.force),
     planIdentity: planIdentity.raw || ''
-  }, timeOptions.timezoneOffset);
+  }, eventTimezoneOffset);
   setProgress(62, 'Montando os dados dos furos...');
   const data = await buildRows(projectRows, finalRows, event, chargeOptions);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
@@ -384,7 +417,7 @@ async function runGeneration(force = false) {
   const planIdentity = readPlanIdentity();
   button.disabled = true; if (forceButton) forceButton.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
-    const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() }, { force, planIdentity });
+    const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() }, { force, planIdentity, manualFireTime: readManualFireTime() });
     setProgress(88, 'Gerando o arquivo Excel...');
     const filename = generated.event.planId
       ? `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`
@@ -401,7 +434,11 @@ async function runGeneration(force = false) {
     result.append(title);
     if (generated.event.forced) {
       const forceNote = document.createElement('p');
-      forceNote.textContent = generated.event.histoPlanId
+      forceNote.textContent = generated.event.timeSource === 'force-default'
+        ? 'O HISTO não apresentou um horário [Fire] legível. A execução forçada usou 12:00:00 como horário local sintético; as validações de estrutura, furos e temporização foram mantidas.'
+        : generated.event.timeSource === 'manual'
+        ? `O horário local ${generated.event.time} foi informado pelo usuário porque o horário do HISTO não foi usado. As demais validações foram mantidas.`
+        : generated.event.histoPlanId
         ? `A execução foi forçada para o plano ${generated.event.planId}; o HISTO registrou o disparo como ${generated.event.histoPlanId}. As demais validações foram mantidas.`
         : 'A execução foi forçada com o identificador informado. As validações de estrutura, furos e temporização foram mantidas.';
       result.append(forceNote);
@@ -413,7 +450,8 @@ async function runGeneration(force = false) {
     }
     const metrics = document.createElement('div'); metrics.className = 'metrics';
     const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]];
-    metricsData.push(['Fuso horário', generated.event.timezoneOffset || 'Original']);
+    metricsData.push(['Fuso horário', generated.event.timezoneOffset || (generated.event.timeSource ? 'Horário local informado' : 'Original')]);
+    metricsData.push(['Fonte do horário', generated.event.timeSource === 'force-default' ? 'Fallback forçado (12:00:00)' : generated.event.timeSource === 'manual' ? 'Informado pelo usuário' : 'HISTO']);
     metricsData.push(['Execução', generated.event.forced ? 'Forçada' : 'Automática']);
     if (generated.event.planIdentity) metricsData.push(['ID / nome informado', generated.event.planIdentity]);
     if (generated.event.histoPlanId) metricsData.push(['ID no HISTO', generated.event.histoPlanId]);
@@ -425,13 +463,20 @@ async function runGeneration(force = false) {
     const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano';
     const message = document.createElement('p'); message.textContent = error.message || String(error);
     result.append(title, message);
-    if (!force && /não foi encontrado no HISTO|múltiplos blocos/i.test(error.message || '')) {
+    if (error.code === 'MISSING_FIRE_TIME') {
+      setManualFireTimeError('O HISTO não trouxe um horário [Fire] legível. Informe o horário local do desmonte e tente novamente.');
+      const hint = document.createElement('p');
+      hint.className = 'force-hint';
+      hint.textContent = 'Preencha o horário acima. Se usar “Forçar execução” sem preencher, o sistema usará 12:00:00 automaticamente.';
+      result.append(hint);
+      manualFireTimeInput?.focus();
+    } else if (!force && /não foi encontrado no HISTO|múltiplos blocos|IDs diferentes/i.test(error.message || '')) {
       const hint = document.createElement('p');
       hint.className = 'force-hint';
       hint.textContent = 'Se a divergência for apenas o mês do ID, informe o plano acima e use o botão “Forçar execução”.';
       result.append(hint);
     }
-    addLogDownload(result, makeClientLog(error, { force, planIdentity })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
+    addLogDownload(result, makeClientLog(error, { force, planIdentity, manualFireTime: manualFireTimeInput?.value.trim() || '' })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
   } finally { result.hidden = false; button.disabled = false; syncActionControls(); statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 
@@ -443,6 +488,10 @@ form.addEventListener('submit', event => {
 forceButton?.addEventListener('click', () => {
   if (!attachedFiles.length) return;
   const identity = planIdentityInput?.value.trim() || 'identificação automática pelos anexos';
-  const confirmed = window.confirm(`Forçar execução usando ${identity}?\n\nIsso ignora somente a divergência de identificação do plano no HISTO. As demais validações continuam ativas.`);
+  const rawTime = manualFireTimeInput?.value.trim() || '';
+  const timeNote = rawTime
+    ? `Será usado o horário local informado: ${window.OpenBlastPlanId.normalizeFireTime(rawTime) || rawTime}.`
+    : 'Se o horário do HISTO não for legível, será usado 12:00:00 como horário local sintético.';
+  const confirmed = window.confirm(`Forçar execução usando ${identity}?\n\n${timeNote}\n\nIsso ignora somente a divergência de identificação e/ou horário do HISTO. As demais validações continuam ativas.`);
   if (confirmed) runGeneration(true);
 });
