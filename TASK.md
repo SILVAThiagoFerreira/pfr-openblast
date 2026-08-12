@@ -31,3 +31,5 @@ Critério objetivo de conclusão:
 ## Atualização do modo online
 - Permitir inclusão e remoção incremental de anexos sem reiniciar a seleção.
 - Reconhecer variações do ID do plano no HISTO, no nome do arquivo e nas tabelas, incluindo zeros à esquerda, separadores e meses diferentes para o mesmo plano/ano, com bloqueio de ambiguidades.
+- Disponibilizar o campo `ID / nome do plano de fogo em trabalho` para identificação manual e o botão confirmado `Forçar execução` para divergências explicáveis pelo mês de emissão/desmonte, preservando as demais validações.
+- Registrar no Excel e no log a identificação manual, o modo forçado e o ID efetivamente encontrado no HISTO quando houver diferença.

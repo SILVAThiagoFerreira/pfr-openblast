@@ -29,12 +29,23 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /accept="[^"]*\.log/);
   assert.match(html, /id="timezone-offset"/);
   assert.match(html, /value="-03:00"/);
+  assert.match(html, /id="plan-identity"/);
+  assert.match(html, /for="plan-identity"[^>]*>ID \/ nome do plano de fogo em trabalho/);
+  assert.match(html, /id="force-submit"[^>]*>Forçar execução/);
+  assert.match(html, /force-execution\.css/);
   assert.match(html, /\.\/modelos\/modelo-pre-corte-sem-furos\.xlsx/);
   assert.match(html, /\.\/modelos\/modelo-producao\.xls/);
   assert.match(app, /\.(?:txt|log)/);
   assert.match(app, /Historial da DRB/);
   assert.equal(fs.existsSync(path.join(root, 'modelos', 'modelo-pre-corte-sem-furos.xlsx')), true);
   assert.equal(fs.existsSync(path.join(root, 'modelos', 'modelo-producao.xls')), true);
+  assert.equal(fs.existsSync(path.join(root, 'force-execution.css')), true);
+  assert.match(app, /parseManualPlanId/);
+  assert.match(app, /runGeneration\(true\)/);
+}
+
+for (const file of ['index.html', 'app.js', 'plan-id.js', 'force-execution.css']) {
+  assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 
 console.log('frontend tests passed');

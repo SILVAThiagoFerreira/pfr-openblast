@@ -7,6 +7,7 @@
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./force-execution.css?v=20260812">
 </head>
 <body>
   <header class="openblast-hubbar" aria-label="Identidade OpenBlast">
@@ -41,6 +42,12 @@
         <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT e LOG</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
+      <fieldset class="plan-identity-settings">
+        <legend>Identificação do plano</legend>
+        <label for="plan-identity">ID / nome do plano de fogo em trabalho</label>
+        <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou Plano 440726" aria-describedby="plan-identity-help">
+        <p id="plan-identity-help" class="field-help">Opcional. Informe o ID do plano que deve ser gravado no Excel. O sistema aceita o ID com ou sem <code>PP</code>; o nome livre fica registrado no resumo.</p>
+      </fieldset>
       <fieldset class="timezone-settings">
         <legend>Conversão de horário</legend>
         <label for="timezone-offset">Fuso horário gravado no Excel</label>
@@ -67,8 +74,12 @@
           <p id="charge-target-error" class="field-error" role="alert" hidden></p>
         </div>
       </fieldset>
+      <div class="generation-actions">
+        <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
+        <button id="force-submit" class="force-submit" type="button" title="Forçar execução" disabled>Forçar execução <span>→</span></button>
+        <p class="field-help force-help">Use somente quando a diferença do ID for explicada pela mudança do mês do projeto para o mês do desmonte. As outras validações permanecem obrigatórias.</p>
+      </div>
       <div id="progress" class="progress" hidden aria-live="polite"><div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
-      <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
     </form>
 
     <section id="result" class="result" hidden></section>
@@ -83,6 +94,6 @@
   </main>
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js"></script><script src="./plan-id.js?v=20260720-carga-alvo"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./timezone.js?v=20260812"></script><script src="./app.js?v=20260812-entradas-horario"></script>
+  <script src="./config.js"></script><script src="./plan-id.js?v=20260812-force-execution"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./timezone.js?v=20260812"></script><script src="./app.js?v=20260812-force-execution"></script>
 </body>
 </html>

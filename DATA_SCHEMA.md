@@ -73,3 +73,5 @@ Colunas principais em `Dados dos Furos`:
 
 ## Metadados de identificação
 IDs de plano podem aparecer como `PP370626`, `PP0370626` ou com separadores. A composição é `PLANO;MÊS;ANO`: os quatro últimos dígitos são mês e ano, e o trecho anterior é o plano. Para comparação, o prefixo e os separadores são removidos, zeros à esquerda do plano são ignorados, o ano deve ser igual e o mês é ignorado para permitir detonação em mês posterior ou anterior ao mês de emissão. A forma encontrada no HISTO é mantida como o ID do evento na saída. Se houver múltiplos blocos compatíveis, o mês coincidente tem prioridade; sem desempate único, a validação falha por ambiguidade.
+
+O novo padrão também aceita marcadores `BP:440826` e `BP: PP440826`. No modo online, `Identificação informada`, `Modo de execução` e, quando aplicável, `ID identificado no HISTO` são gravados na aba `Resumo`; a execução forçada não desativa as validações de estrutura ou temporização.

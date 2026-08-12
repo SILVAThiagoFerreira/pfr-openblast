@@ -53,6 +53,7 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`.
+- O campo opcional `ID / nome do plano de fogo em trabalho` permite informar a identificação desejada para o Excel. Quando a divergência for somente entre meses do ID, o botão `Forçar execução` pede confirmação, mantém as validações operacionais e registra o ID informado e o ID do HISTO no resumo/log.
 
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.
@@ -66,6 +67,8 @@ Exemplo validado:
 Quando `business.enforce_charge_total_target` estiver habilitado, o total de `cargas realizadas` e fechado em `business.charge_total_target_kg` sem alterar o furo de menor carga nem o de maior carga.
 
 No site, o campo opcional **Forçar total de carga realizada** permite informar esse alvo diretamente em kg para a execução atual. O valor é distribuído entre os furos intermediários, mantendo o menor e o maior valor originais e fechando o total com precisão. Sem habilitar o campo, o site preserva a distribuição padrão; se o alvo for inviável, a validação é interrompida com o motivo.
+
+No novo HISTO, os marcadores `BP:440826` e `BP: PP440826` são reconhecidos. Se o usuário informar, por exemplo, `PP440726` no campo de identificação e o HISTO registrar `440826`, a execução forçada grava `440726` como plano do Excel e mantém `440826` como referência do HISTO, sem alterar as validações restantes.
 
 ## Estrutura
 - `input/` — coloque os arquivos de entrada aqui

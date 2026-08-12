@@ -44,6 +44,8 @@ No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`.
 
 O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado.
 
+Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e ignora somente a divergência de identificação; colunas, PDF, furos e temporizações continuam sendo validados.
+
 ## Determinismo
 - Ordenação por `Number`.
 - Formatos e nomes fixos via configuração.

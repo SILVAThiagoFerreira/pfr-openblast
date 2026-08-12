@@ -23,5 +23,8 @@
 
 20. Validar a saída final e interromper a exportação se houver tempo vazio, negativo ou repetido.
 
+21. No modo online, aceitar a identificação manual opcional do plano e registrar o valor no resumo/log.
+22. Disponibilizar `Forçar execução` como ação explícita e confirmada para divergências de ID; quando usado, manter todas as validações estruturais e registrar o ID informado e o ID encontrado no HISTO.
+
 ### Modo online incremental
 As seleções sucessivas são acumuladas em memória, com deduplicação por nome, tamanho e data de modificação. A remoção atualiza imediatamente o conjunto submetido. Antes de escolher o evento do HISTO, o pipeline coleta IDs candidatos dos nomes e das primeiras linhas das tabelas e cruza-os com o bloco de plano usando a composição `PLANO;MÊS;ANO`: zeros à esquerda e separadores são normalizados, o ano é preservado e o mês não impede a associação.

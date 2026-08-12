@@ -15,6 +15,8 @@ const chargeTargetSettings = document.querySelector('#charge-target-settings');
 const chargeTargetInput = document.querySelector('#charge-target-input');
 const chargeTargetError = document.querySelector('#charge-target-error');
 const timezoneOffset = document.querySelector('#timezone-offset');
+const planIdentityInput = document.querySelector('#plan-identity');
+const forceButton = document.querySelector('#force-submit');
 let attachedFiles = [];
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
@@ -71,6 +73,11 @@ function syncInputFiles() {
   attachedFiles.forEach(file => transfer.items.add(file));
   input.files = transfer.files;
   renderFiles(attachedFiles);
+  syncActionControls();
+}
+
+function syncActionControls() {
+  if (forceButton) forceButton.disabled = !attachedFiles.length;
 }
 
 function appendFiles(files) {
@@ -91,11 +98,13 @@ input.addEventListener('change', () => {
 ['dragenter', 'dragover'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.add('drag'); }));
 ['dragleave', 'drop'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.remove('drag'); }));
 drop.addEventListener('drop', e => appendFiles([...e.dataTransfer.files]));
+syncActionControls();
 
-function makeClientLog(error) {
+function makeClientLog(error, options = {}) {
   const files = [...input.files].map(file => file.name).join('\n') || '-';
   const offset = timezoneOffset?.value || 'none';
-  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+  const identity = options.planIdentity?.raw || '-';
+  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
 function setProgress(value, label) {
@@ -152,6 +161,11 @@ function readChargeTarget() {
 function readTimezoneOffset() {
   const value = timezoneOffset?.value || 'none';
   return value === 'none' ? null : value;
+}
+
+function readPlanIdentity() {
+  const raw = planIdentityInput?.value.trim() || '';
+  return { raw, manualPlanId: window.OpenBlastPlanId.parseManualPlanId(raw) };
 }
 
 chargeTargetToggle.addEventListener('change', syncChargeTargetControls);
@@ -316,8 +330,11 @@ function buildWorkbook(data, sources, event, chargeOptions = {}) {
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
   const summaryRows = [
     ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time],
-    ['Fuso horário', event.timezoneOffset || 'Horário original do HISTO']
+    ['Fuso horário', event.timezoneOffset || 'Horário original do HISTO'],
+    ['Modo de execução', event.forced ? 'Forçada' : 'Validação automática']
   ];
+  if (event.planIdentity) summaryRows.push(['Identificação informada', event.planIdentity]);
+  if (event.histoPlanId) summaryRows.push(['ID identificado no HISTO', event.histoPlanId]);
   if (chargeOptions.enabled) summaryRows.push(['Carga-alvo aplicado (kg)', chargeOptions.target]);
   const summary = XLSX.utils.aoa_to_sheet(summaryRows);
   summary['!cols'] = [{ wch: 28 }, { wch: 42 }];
@@ -327,7 +344,7 @@ function buildWorkbook(data, sources, event, chargeOptions = {}) {
   return workbook;
 }
 
-async function generateLocally(files, chargeOptions = {}, timeOptions = {}) {
+async function generateLocally(files, chargeOptions = {}, timeOptions = {}, planOptions = {}) {
   if (typeof XLSX === 'undefined') throw new Error('A biblioteca local de Excel não carregou. Recarregue a página e tente novamente.');
   if (files.length > 20) throw new Error('Envie no máximo 20 arquivos por execução.');
   const totalBytes = files.reduce((total, file) => total + file.size, 0);
@@ -339,8 +356,16 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}) {
   const { projectRows, finalRows, histoText, planHints } = sources;
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
-  const resolvedEvent = resolvePlanAndFire(histoText, planHints);
-  const event = window.OpenBlastTimezone.convertEvent(resolvedEvent, timeOptions.timezoneOffset);
+  const planIdentity = planOptions.planIdentity || {};
+  const resolvedEvent = resolvePlanAndFire(histoText, planHints, {
+    force: Boolean(planOptions.force),
+    manualPlanId: planIdentity.manualPlanId
+  });
+  const event = window.OpenBlastTimezone.convertEvent({
+    ...resolvedEvent,
+    forced: Boolean(planOptions.force),
+    planIdentity: planIdentity.raw || ''
+  }, timeOptions.timezoneOffset);
   setProgress(62, 'Montando os dados dos furos...');
   const data = await buildRows(projectRows, finalRows, event, chargeOptions);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
@@ -354,20 +379,33 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}) {
   };
 }
 
-form.addEventListener('submit', async event => {
-  event.preventDefault();
+async function runGeneration(force = false) {
   if (!attachedFiles.length) return;
+  const planIdentity = readPlanIdentity();
   button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
-    const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() });
+    const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() }, { force, planIdentity });
     setProgress(88, 'Gerando o arquivo Excel...');
-    const filename = `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`;
+    const filename = generated.event.planId
+      ? `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`
+      : 'Plano_Fogo_Realizado.xlsx';
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
     const link = document.createElement('a');
     link.className = 'download'; link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     link.download = filename; link.textContent = 'Baixar plano realizado (.xlsx) →';
     result.className = 'result'; result.replaceChildren();
-    const title = document.createElement('h3'); title.textContent = generated.chargeTargetApplied ? 'Plano gerado com carga-alvo aplicada' : 'Plano gerado com sucesso'; result.append(title);
+    const title = document.createElement('h3');
+    title.textContent = generated.event.forced
+      ? 'Plano gerado com execução forçada'
+      : generated.chargeTargetApplied ? 'Plano gerado com carga-alvo aplicada' : 'Plano gerado com sucesso';
+    result.append(title);
+    if (generated.event.forced) {
+      const forceNote = document.createElement('p');
+      forceNote.textContent = generated.event.histoPlanId
+        ? `A execução foi forçada para o plano ${generated.event.planId}; o HISTO registrou o disparo como ${generated.event.histoPlanId}. As demais validações foram mantidas.`
+        : 'A execução foi forçada com o identificador informado. As validações de estrutura, furos e temporização foram mantidas.';
+      result.append(forceNote);
+    }
     if (generated.chargeTargetApplied) {
       const targetNote = document.createElement('p');
       targetNote.textContent = `Distribuição forçada concluída: ${generated.chargeTarget.toFixed(2)} kg foram distribuídos nos furos intermediários, preservando os extremos.`;
@@ -376,10 +414,35 @@ form.addEventListener('submit', async event => {
     const metrics = document.createElement('div'); metrics.className = 'metrics';
     const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]];
     metricsData.push(['Fuso horário', generated.event.timezoneOffset || 'Original']);
+    metricsData.push(['Execução', generated.event.forced ? 'Forçada' : 'Automática']);
+    if (generated.event.planIdentity) metricsData.push(['ID / nome informado', generated.event.planIdentity]);
+    if (generated.event.histoPlanId) metricsData.push(['ID no HISTO', generated.event.histoPlanId]);
     if (generated.chargeTargetApplied) metricsData.push(['Alvo aplicado', `${generated.chargeTarget.toFixed(2)} kg`]);
     metricsData.forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
     result.append(metrics, link); statusText.textContent = 'Online'; setProgress(100, 'Concluído. O Excel está pronto para baixar.');
   } catch (error) {
-    result.className = 'result error'; result.replaceChildren(); const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano'; const message = document.createElement('p'); message.textContent = error.message || String(error); result.append(title, message); addLogDownload(result, makeClientLog(error)); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
-  } finally { result.hidden = false; button.disabled = false; statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    result.className = 'result error'; result.replaceChildren();
+    const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano';
+    const message = document.createElement('p'); message.textContent = error.message || String(error);
+    result.append(title, message);
+    if (!force && /não foi encontrado no HISTO|múltiplos blocos/i.test(error.message || '')) {
+      const hint = document.createElement('p');
+      hint.className = 'force-hint';
+      hint.textContent = 'Se a divergência for apenas o mês do ID, informe o plano acima e use o botão “Forçar execução”.';
+      result.append(hint);
+    }
+    addLogDownload(result, makeClientLog(error, { force, planIdentity })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
+  } finally { result.hidden = false; button.disabled = false; syncActionControls(); statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+}
+
+form.addEventListener('submit', event => {
+  event.preventDefault();
+  runGeneration(false);
+});
+
+forceButton?.addEventListener('click', () => {
+  if (!attachedFiles.length) return;
+  const identity = planIdentityInput?.value.trim() || 'identificação automática pelos anexos';
+  const confirmed = window.confirm(`Forçar execução usando ${identity}?\n\nIsso ignora somente a divergência de identificação do plano no HISTO. As demais validações continuam ativas.`);
+  if (confirmed) runGeneration(true);
 });

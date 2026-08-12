@@ -18,6 +18,10 @@ assert.equal(planId.planIdsMatch('PP290726', 'PP290726'), true);
 assert.equal(planId.planIdsMatch('PP0290426', 'PP400726'), false);
 assert.equal(planId.planIdsMatch('PP0290426', 'PP290727'), false);
 assert.deepEqual(JSON.parse(JSON.stringify(planId.extractPlanIds('PP290726_D _ TEMPORIZAÇÃO 2 _ PP400726'))), ['PP290726_D', 'PP400726']);
+assert.deepEqual(JSON.parse(JSON.stringify(planId.extractPlanIds('BP: 440826'))), ['BP: 440826']);
+assert.equal(planId.parseManualPlanId('PP0440726_D'), '440726');
+assert.equal(planId.parseManualPlanId('440726'), '440726');
+assert.equal(planId.parseManualPlanId('Plano de produção'), '');
 
 const history = `[BlastingPlan]2026/07/16-12:29:07;84;+34.3\nPP290726\n-\n[Fire]2026/07/16-12:32:49;83;+33.5\n`;
 assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(history, ['290426']))), {
@@ -32,5 +36,19 @@ const startProcedureHistory = `[StartProcedure] 2026/07/16-11:00:00;84;+34.3\nPP
 assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(startProcedureHistory, ['290426']))), {
   planId: '290726', date: '16/07/2026', time: '12:32:49'
 });
+
+const crossMonthHistory = `[StartProcedure] 2026/08/04-15:00:00;84;+34.3\nBP:440826\n-\n[Fire] 2026/08/04-15:29:45;83;+33.5\n`;
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(crossMonthHistory, ['440726']))), {
+  planId: '440826', date: '04/08/2026', time: '15:29:45'
+});
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(crossMonthHistory, ['440726'], { force: true, manualPlanId: '440726' }))), {
+  planId: '440726', date: '04/08/2026', time: '15:29:45', forced: true, histoPlanId: '440826'
+});
+
+const unrelatedHistory = `[StartProcedure] 2026/09/04-15:00:00;84;+34.3\nBP:991026\n-\n[Fire] 2026/09/04-15:29:45;83;+33.5\n`;
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(unrelatedHistory, ['440726'], { force: true, manualPlanId: '440726' }))), {
+  planId: '440726', date: '04/09/2026', time: '15:29:45', forced: true, histoPlanId: '991026'
+});
+assert.throws(() => planId.resolvePlanAndFire(crossMonthHistory, ['440726', '550726'], { force: true }), /ID manual/);
 
 console.log('plan-id tests passed');

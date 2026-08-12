@@ -1,0 +1,12 @@
+.plan-identity-settings{margin:4px 0 14px;border:1px solid var(--line);padding:18px;background:#fbfcfc}
+.plan-identity-settings legend{padding:0 7px;color:var(--gray);font-size:12px;font-weight:700;letter-spacing:.04em}
+.plan-identity-settings label{display:block;color:var(--gray);font-size:13px;font-weight:700;margin-bottom:7px}
+.plan-identity-settings input{width:100%;max-width:470px;height:44px;border:1px solid #aeb7bd;padding:0 12px;color:var(--ink);font:inherit;background:var(--white)}
+.plan-identity-settings input:focus{outline:2px solid rgba(226,6,19,.22);outline-offset:1px;border-color:var(--red)}
+.generation-actions{margin-top:4px}
+.generation-actions button+button{margin-top:10px}
+.force-submit{background:var(--gray)}
+.force-submit:hover{background:#263540}
+.force-submit:disabled{opacity:.45;cursor:not-allowed}
+.force-help{text-align:center;margin:10px auto 0;max-width:760px}
+.force-hint{font-weight:700;color:#7d2026}
