@@ -28,4 +28,9 @@ assert.throws(() => planId.resolvePlanAndFire(
   ['290426']
 ), /múltiplos blocos/);
 
+const startProcedureHistory = `[StartProcedure] 2026/07/16-11:00:00;84;+34.3\nPP400726\n-\n[Fire] 2026/07/16-11:02:00;83;+33.5\n[Fire] 2026/07/16-11:03:00;83;+33.5\n[StartProcedure] 2026/07/16-12:00:00;84;+34.3\nPP290726\n-\n[Fire] 2026/07/16-12:32:49;83;+33.5\n[Fire] 2026/07/16-12:40:00;83;+33.5\n`;
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(startProcedureHistory, ['290426']))), {
+  planId: '290726', date: '16/07/2026', time: '12:32:49'
+});
+
 console.log('plan-id tests passed');

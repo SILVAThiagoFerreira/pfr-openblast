@@ -21,11 +21,18 @@ def main() -> int:
     parser.add_argument("--web", action="store_true", help="Inicia a interface web")
     parser.add_argument("--host", default="127.0.0.1", help="Host da interface web")
     parser.add_argument("--port", type=int, default=5000, help="Porta da interface web")
+    parser.add_argument(
+        "--timezone-offset-hours",
+        "--timezone-offset",
+        dest="timezone_offset_hours",
+        default=None,
+        help="Deslocamento a somar ao horário bruto do HISTO (ex.: -3 ou -03:00)",
+    )
     args = parser.parse_args()
     if args.web:
         create_app(ROOT, ROOT / args.config).run(host=args.host, port=args.port, debug=False)
         return 0
-    result = run(ROOT / args.config)
+    result = run(ROOT / args.config, timezone_offset_hours=args.timezone_offset_hours)
     print()
     print("=" * 50)
     print(f"  Total emulsao gerado: {result.total_emulsion_kg:.2f} kg")

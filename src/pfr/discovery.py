@@ -33,7 +33,12 @@ def discover_sources(cfg: dict) -> SourceFiles:
     project = find_first(input_root, pp["project_patterns"])
     final = find_first(input_root, pp["final_patterns"])
     plan_pdf = find_first(input_root, pp["plan_pdf_patterns"])
-    histo_files = tuple(sorted({p for pattern in pp["histo_patterns"] for p in input_root.iterdir() if p.is_file() and fnmatch(p.name.lower(), pattern.lower())}))
+    histo_files = tuple(find_all(input_root, pp.get("histo_patterns", [])))
+    if not histo_files:
+        # O exportador novo usa nomes como bm-0322110826-1408_histo.log.
+        # Mantemos os padrões configurados como prioridade para não mudar a
+        # seleção de históricos antigos quando ambos estiverem presentes.
+        histo_files = tuple(find_all(input_root, ["*_histo.log"]))
     if project is None or final is None:
         raise FileNotFoundError("Arquivos PP obrigatorios nao encontrados")
     return SourceFiles(project=project, final=final, plan_pdf=plan_pdf, histo_files=histo_files)

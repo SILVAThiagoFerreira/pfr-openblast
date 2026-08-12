@@ -19,13 +19,38 @@
       <div class="status"><span id="status-dot"></span><span id="status-text">Pronto para processar</span></div>
     </section>
 
+    <section class="input-tutorial" aria-labelledby="input-tutorial-title">
+      <div class="input-tutorial__intro">
+        <span class="eyebrow red">TUTORIAL DE ENTRADAS</span>
+        <h2 id="input-tutorial-title">Separe estes cinco arquivos antes de começar</h2>
+        <p>Use os arquivos do mesmo plano e confira os nomes e formatos abaixo. O histórico da DRB pode ser enviado como TXT ou LOG.</p>
+      </div>
+      <ol class="input-tutorial__list">
+        <li class="input-tutorial__item"><span class="number">01</span><div><strong>Config Final.csv</strong><p>Arquivo de temporização exportado em CSV após a Atualização dos Furos, para que as quantidades estejam iguais ao executado.</p></div></li>
+        <li class="input-tutorial__item"><span class="number">02</span><div><strong>Projeto Completo.csv</strong><p>Arquivo de QAQC do O-PitSurface.</p></div></li>
+        <li class="input-tutorial__item"><span class="number">03</span><div><strong>Historial da DRB</strong><p>Histórico exportado pela DRB em <code>.txt</code> ou no novo padrão <code>.log</code>, com <code>StartProcedure</code>, <code>BP:</code> e <code>[Fire]</code>.</p></div></li>
+        <li class="input-tutorial__item"><span class="number">04</span><div><strong>Plano de Perfuração.xlsx</strong><p>Planilha do Plano de Perfuração correspondente ao desmonte.</p></div></li>
+        <li class="input-tutorial__item"><span class="number">05</span><div><strong>Plano de Perfuração.pdf</strong><p>PDF do Plano de Perfuração para conferência.</p></div></li>
+      </ol>
+    </section>
+
     <form id="form" class="workspace" novalidate>
       <label id="dropzone" class="dropzone" for="inputs">
-        <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt" required>
+        <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt,.log" required>
         <span class="upload-icon">↑</span><strong>Anexe os arquivos de entrada</strong>
-        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF e TXT</span>
+        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT e LOG</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
+      <fieldset class="timezone-settings">
+        <legend>Conversão de horário</legend>
+        <label for="timezone-offset">Fuso horário gravado no Excel</label>
+        <select id="timezone-offset" name="timezoneOffset" aria-describedby="timezone-help">
+          <option value="-03:00" selected>UTC-03:00 (Brasília)</option>
+          <option value="+00:00">UTC+00:00 (UTC)</option>
+          <option value="none">Não converter (horário original do HISTO)</option>
+        </select>
+        <p id="timezone-help" class="field-help">A opção UTC-03:00 converte a data e a hora do HISTO para o horário de Brasília antes de gerar o Excel.</p>
+      </fieldset>
       <fieldset class="charge-target">
         <legend>Distribuição forçada da carga realizada</legend>
         <label class="charge-target__toggle" for="enable-charge-target">
@@ -47,10 +72,17 @@
     </form>
 
     <section id="result" class="result" hidden></section>
-    <section class="requirements"><div><span class="number">01</span><strong>Arquivos necessários</strong><p>Projeto completo, config final, PP em PDF e HISTO em TXT.</p></div><div><span class="number">02</span><strong>Validação automática</strong><p>Colunas, plano, data, carga e estrutura são conferidos antes da exportação.</p></div><div><span class="number">03</span><strong>Excel rastreável</strong><p>O arquivo é identificado pelo plano e acompanha um resumo da execução.</p></div></section>
+    <section id="models" class="models" aria-labelledby="models-title">
+      <div class="models__intro"><span class="eyebrow red">MODELOS</span><h2 id="models-title">Baixe os modelos Excel</h2><p>Use os modelos para preparar as planilhas de apoio antes de anexá-las ao processamento.</p></div>
+      <div class="models__downloads">
+        <a class="download model-download" href="./modelos/modelo-pre-corte-sem-furos.xlsx" download="modelo-pre-corte-sem-furos.xlsx" aria-label="Baixar Modelo - Pré-Corte - SEM FUROS"><span>Modelo - Pré-Corte - SEM FUROS</span><span aria-hidden="true">↓</span></a>
+        <a class="download model-download" href="./modelos/modelo-producao.xls" download="modelo-producao.xls" aria-label="Baixar Modelo - Produção"><span>Modelo - Produção</span><span aria-hidden="true">↓</span></a>
+      </div>
+    </section>
+    <section class="requirements"><div><span class="number">01</span><strong>Entradas orientadas</strong><p>O tutorial identifica as cinco entradas e o histórico da DRB aceita TXT ou LOG.</p></div><div><span class="number">02</span><strong>Validação automática</strong><p>Colunas, plano, data, carga e estrutura são conferidos antes da exportação.</p></div><div><span class="number">03</span><strong>Excel rastreável</strong><p>O arquivo é identificado pelo plano e acompanha o horário convertido no resumo.</p></div></section>
   </main>
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js"></script><script src="./plan-id.js?v=20260720-carga-alvo"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./app.js?v=20260720-carga-alvo"></script>
+  <script src="./config.js"></script><script src="./plan-id.js?v=20260720-carga-alvo"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./timezone.js?v=20260812"></script><script src="./app.js?v=20260812-entradas-horario"></script>
 </body>
 </html>

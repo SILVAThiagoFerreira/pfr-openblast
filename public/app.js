@@ -14,6 +14,7 @@ const chargeTargetToggle = document.querySelector('#enable-charge-target');
 const chargeTargetSettings = document.querySelector('#charge-target-settings');
 const chargeTargetInput = document.querySelector('#charge-target-input');
 const chargeTargetError = document.querySelector('#charge-target-error');
+const timezoneOffset = document.querySelector('#timezone-offset');
 let attachedFiles = [];
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
@@ -93,7 +94,8 @@ drop.addEventListener('drop', e => appendFiles([...e.dataTransfer.files]));
 
 function makeClientLog(error) {
   const files = [...input.files].map(file => file.name).join('\n') || '-';
-  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+  const offset = timezoneOffset?.value || 'none';
+  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
 function setProgress(value, label) {
@@ -145,6 +147,11 @@ function readChargeTarget() {
   }
   setChargeTargetError();
   return { enabled: true, target };
+}
+
+function readTimezoneOffset() {
+  const value = timezoneOffset?.value || 'none';
+  return value === 'none' ? null : value;
 }
 
 chargeTargetToggle.addEventListener('change', syncChargeTargetControls);
@@ -213,16 +220,16 @@ async function findSources(files) {
   if (projectEntry && finalEntry && projectEntry.file.name === finalEntry.file.name) {
     throw new Error('Os arquivos de projeto e realizado precisam ser tabelas diferentes.');
   }
-  const textFiles = files.filter(file => /\.txt$/i.test(file.name));
+  const textFiles = files.filter(file => /\.(?:txt|log)$/i.test(file.name));
   setProgress(30, 'Lendo o histórico de disparos...');
   const textCandidates = await Promise.all(textFiles.map(async file => ({ file, text: decodeText(new Uint8Array(await file.arrayBuffer())) })));
-  const histoEntry = textCandidates.find(item => /^HISTO-.*\.txt$/i.test(item.file.name))
-    || textCandidates.find(item => /histo/i.test(item.file.name))
+  const histoEntry = textCandidates.find(item => /^HISTO-.*\.(?:txt|log)$/i.test(item.file.name))
+    || textCandidates.find(item => /histo|historial.*drb/i.test(item.file.name))
     || textCandidates.find(item => /\[Fire\]\d{4}\/\d{2}\/\d{2}-\d{2}:\d{2}:\d{2}/.test(item.text));
   const histo = histoEntry?.file;
   const pdf = files.find(file => /\.pdf$/i.test(file.name));
   if (!projectEntry || !finalEntry) throw new Error('Não foi possível identificar as tabelas. Confira se uma contém as colunas do projeto e outra as colunas do realizado.');
-  if (!histo) throw new Error('Envie o arquivo HISTO-*.txt.');
+  if (!histo) throw new Error('Envie o Historial da DRB em HISTO-*.txt ou HISTO-*.log.');
   if (!pdf) throw new Error('Envie o PP.pdf.');
   const pdfHeader = decodeText(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
   if (!pdfHeader.startsWith('%PDF-')) throw new Error(`O arquivo ${pdf.name} não parece ser um PDF válido.`);
@@ -308,7 +315,8 @@ function buildWorkbook(data, sources, event, chargeOptions = {}) {
   const sheet = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLUMNS });
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
   const summaryRows = [
-    ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time]
+    ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time],
+    ['Fuso horário', event.timezoneOffset || 'Horário original do HISTO']
   ];
   if (chargeOptions.enabled) summaryRows.push(['Carga-alvo aplicado (kg)', chargeOptions.target]);
   const summary = XLSX.utils.aoa_to_sheet(summaryRows);
@@ -319,7 +327,7 @@ function buildWorkbook(data, sources, event, chargeOptions = {}) {
   return workbook;
 }
 
-async function generateLocally(files, chargeOptions = {}) {
+async function generateLocally(files, chargeOptions = {}, timeOptions = {}) {
   if (typeof XLSX === 'undefined') throw new Error('A biblioteca local de Excel não carregou. Recarregue a página e tente novamente.');
   if (files.length > 20) throw new Error('Envie no máximo 20 arquivos por execução.');
   const totalBytes = files.reduce((total, file) => total + file.size, 0);
@@ -331,7 +339,8 @@ async function generateLocally(files, chargeOptions = {}) {
   const { projectRows, finalRows, histoText, planHints } = sources;
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
-  const event = resolvePlanAndFire(histoText, planHints);
+  const resolvedEvent = resolvePlanAndFire(histoText, planHints);
+  const event = window.OpenBlastTimezone.convertEvent(resolvedEvent, timeOptions.timezoneOffset);
   setProgress(62, 'Montando os dados dos furos...');
   const data = await buildRows(projectRows, finalRows, event, chargeOptions);
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
@@ -350,7 +359,7 @@ form.addEventListener('submit', async event => {
   if (!attachedFiles.length) return;
   button.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
-    const generated = await generateLocally(attachedFiles, readChargeTarget());
+    const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() });
     setProgress(88, 'Gerando o arquivo Excel...');
     const filename = `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`;
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
@@ -365,7 +374,8 @@ form.addEventListener('submit', async event => {
       result.append(targetNote);
     }
     const metrics = document.createElement('div'); metrics.className = 'metrics';
-    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]];
+    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]];
+    metricsData.push(['Fuso horário', generated.event.timezoneOffset || 'Original']);
     if (generated.chargeTargetApplied) metricsData.push(['Alvo aplicado', `${generated.chargeTarget.toFixed(2)} kg`]);
     metricsData.forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
     result.append(metrics, link); statusText.textContent = 'Online'; setProgress(100, 'Concluído. O Excel está pronto para baixar.');

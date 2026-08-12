@@ -51,18 +51,31 @@
     return `${day}/${month}/${year}`;
   }
 
+  function historyBlocks(text, events) {
+    const source = String(text ?? '');
+    return events
+      .map((event, index) => {
+        if (!['BlastingPlan', 'StartProcedure'].includes(event[1])) return null;
+        const nextBlock = events.slice(index + 1).find(item => item[1] !== 'Fire');
+        const end = nextBlock ? nextBlock.index : source.length;
+        const fire = events.slice(index + 1).find(item => item[1] === 'Fire' && item.index < end);
+        return {
+          event,
+          text: source.slice(event.index, end),
+          fire,
+          planIds: extractPlanIds(source.slice(event.index, end)).map(normalizePlanId).filter(Boolean)
+        };
+      })
+      .filter(Boolean);
+  }
+
   function extractPlanAndFire(text) {
-    const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
+    const eventRegex = /\[(BlastingPlan|StartProcedure|Fire)\][ \t]*(\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
     const events = [...String(text ?? '').matchAll(eventRegex)];
-    for (let index = 0; index < events.length; index += 1) {
-      const event = events[index];
-      if (event[1] !== 'BlastingPlan') continue;
-      const end = index + 1 < events.length ? events[index + 1].index : text.length;
-      const blockPlans = extractPlanIds(text.slice(event.index, end)).map(normalizePlanId);
-      const planId = blockPlans[blockPlans.length - 1];
-      if (!planId) continue;
-      const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
-      if (fire) return { planId, date: formatDate(fire[2]), time: fire[3] };
+    const block = historyBlocks(text, events).find(item => item.planIds.length && item.fire);
+    if (block) {
+      const planId = block.planIds[block.planIds.length - 1];
+      return { planId, date: formatDate(block.fire[2]), time: block.fire[3] };
     }
     const plans = extractPlanIds(text).map(normalizePlanId);
     const planId = [...new Set(plans)].pop();
@@ -75,23 +88,21 @@
 
   function resolvePlanAndFire(text, hints) {
     const normalizedHints = new Set(hints);
-    const eventRegex = /\[(BlastingPlan|Fire)\](\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
-    const events = [...String(text ?? '').matchAll(eventRegex)];
-    const matches = [];
-    for (let index = events.length - 1; index >= 0; index -= 1) {
-      if (events[index][1] !== 'BlastingPlan') continue;
-      const end = index + 1 < events.length ? events[index + 1].index : text.length;
-      const block = text.slice(events[index].index, end);
-      const candidates = extractPlanIds(block).map(normalizePlanId);
-      const match = candidates.map(planId => ({
+    const source = String(text ?? '');
+    const eventRegex = /\[(BlastingPlan|StartProcedure|Fire)\][ \t]*(\d{4}\/\d{2}\/\d{2})-(\d{2}:\d{2}:\d{2})/g;
+    const events = [...source.matchAll(eventRegex)];
+    const matches = historyBlocks(source, events).flatMap(block => {
+      const match = block.planIds.map(planId => ({
         planId,
         hint: [...normalizedHints].find(sourceId => planIdsMatch(sourceId, planId))
       })).find(item => item.hint);
-      const fire = events.slice(index + 1).find(item => item[1] === 'Fire');
-      if (match && fire) matches.push({ ...match, date: formatDate(fire[2]), time: fire[3] });
-    }
-    const sameMonthMatches = matches.filter(match => planIdsMatchSameMonth(match.hint, match.planId));
-    const viableMatches = sameMonthMatches.length ? sameMonthMatches : matches;
+      return match && block.fire
+        ? [{ ...match, date: formatDate(block.fire[2]), time: block.fire[3], fireIndex: block.fire.index }]
+        : [];
+    });
+    const uniqueMatches = [...new Map(matches.map(match => [`${match.planId}|${match.fireIndex}`, match])).values()];
+    const sameMonthMatches = uniqueMatches.filter(match => planIdsMatchSameMonth(match.hint, match.planId));
+    const viableMatches = sameMonthMatches.length ? sameMonthMatches : uniqueMatches;
     if (viableMatches.length > 1) {
       throw new Error(`Foram encontrados múltiplos blocos [BlastingPlan] compatíveis com os anexos (${[...normalizedHints].join(', ')}): ${viableMatches.map(match => match.planId).join(', ')}.`);
     }

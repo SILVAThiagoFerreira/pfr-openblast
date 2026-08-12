@@ -4,10 +4,11 @@
 Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP, com validação prévia, backup e rastreabilidade.
 
 ## Entradas
-- Projeto: `*PROJETO COMPLETO*`
-- Realizado: `*CONFIG FINAL*`
-- Plano PDF: `PP*.pdf` ou `PP.pdf`
-- Histórico: `HISTO-*.txt`
+- Projeto: `Projeto Completo.csv` (`*PROJETO COMPLETO*`)
+- Realizado: `Config Final.csv` (`*CONFIG FINAL*`), exportado após Atualização dos Furos
+- Plano Excel: `Plano de Perfuração.xlsx`
+- Plano PDF: `Plano de Perfuração.pdf` (`PP*.pdf` ou `PP.pdf`)
+- Histórico da DRB: `.txt` ou novo padrão `*_histo.log`
 
 ## Regras
 - O ID do plano deve ser resolvido de forma auditável. O sistema tenta extrair o ID nesta ordem: (1) regex configurado no conteúdo do PDF, (2) regex configurado no conteúdo do HISTO, (3) padrão PP nos nomes dos arquivos de entrada, (4) `business.fallback_plan_id`. O modo `"auto"` habilita todas as fontes; o modo `"fallback"` usa apenas nomes de arquivo e fallback.
@@ -15,6 +16,8 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - O ID segue a composição `PP<PLANO><MÊS><ANO>`: os quatro últimos dígitos representam mês e ano, e os dígitos anteriores representam o plano. Para localizar o bloco no HISTO, o mês pode ser diferente entre o PDF/arquivos e a detonação; a comparação exige o mesmo plano e ano, ignorando apenas o mês. O ID do evento encontrado no HISTO permanece como o identificador da execução.
 - Se mais de um bloco `[BlastingPlan]` for compatível com o mesmo plano e ano, priorizar o bloco cujo mês coincida com o ID de origem; permanecendo mais de um candidato, abortar com erro explícito de ambiguidade.
 - A data/hora do disparo não deve vir do último `[Fire]` do histórico inteiro. O sistema deve localizar o bloco `[BlastingPlan]` que contém o plano operacional, por exemplo `PP320526`, e usar o primeiro evento `[Fire]` posterior a esse bloco.
+- No novo histórico, o sistema também deve localizar o bloco `[StartProcedure]` que contenha a linha `BP: PP<plano>` e usar o primeiro `[Fire]` posterior dentro desse bloco. Cabeçalhos com espaços, `BP:` e múltiplos eventos `[Fire]` são aceitos.
+- A conversão de fuso é explícita. O offset selecionado (por exemplo, `-03:00`) deve ser aplicado ao instante do HISTO antes da gravação no Excel e identificado no resumo.
 - IDs numéricos presentes em linhas de teste, detonadores ou eventos como `TestDetsResult` não são IDs de plano e não podem nomear a saída.
 - Registros com `eliminated == 1` não entram na saída.
 - O campo `eliminated` é tratado como opcional no arquivo final; quando ausente, a validação não bloqueia a execução.

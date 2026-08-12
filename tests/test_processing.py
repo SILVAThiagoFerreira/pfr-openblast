@@ -59,6 +59,69 @@ DBD0233;94
         self.assertEqual(blast_date, "19/06/2026")
         self.assertEqual(blast_time, "12:10:52")
 
+    def test_new_log_uses_start_procedure_plan_and_applies_timezone_offset(self):
+        cfg = normalize_config(load_config(ROOT / "config.yaml"), ROOT)
+        histo_content = """[HistoryStart] 2026/08/11-17:08:39
+DT5G-N
+-
+[StartProcedure] 2026/08/11-15:20:59
+ BP: REG-F3
+  BMO: 0148;87
+   DELAYS: 100000;3600
+ BP: PP220826
+  BMO: 0160;86
+   DELAYS: 50;222900
+-
+[FiringCard] 2026/08/11-15:28:25
+STATUS: Valid
+-
+[Fire] 2026/08/11-15:29:45
+BMO352:
+-
+[Fire] 2026/08/11-15:30:52
+BMO328:
+-
+[FiringProcedureAborted] 2026/08/11-15:31:09
+BMO: 0138
+-
+[HistoryEnd]
+"""
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bm-0322110826-1408_histo.log"
+            path.write_text(histo_content, encoding="utf-8")
+
+            plan_id = extract_plan_id(None, (path,), cfg)
+            blast_date, blast_time = extract_blast_datetime(
+                (path,),
+                plan_id,
+                timezone_offset_hours="-03:00",
+            )
+
+        self.assertEqual(plan_id, "220826")
+        self.assertEqual(blast_date, "11/08/2026")
+        self.assertEqual(blast_time, "12:29:45")
+
+    def test_new_log_fallback_accepts_spaced_fire_header_and_crosses_date(self):
+        history = """[Fire] 2026/01/02-00:30:00
+BMO328:
+-
+[Fire] 2026/01/02-01:02:03
+BMO352:
+-
+"""
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bm_histo.log"
+            path.write_text(history, encoding="utf-8")
+            blast_date, blast_time = extract_blast_datetime(
+                (path,),
+                "999999",
+                allow_unmatched_plan_fallback=True,
+                timezone_offset_hours=-3,
+            )
+
+        self.assertEqual(blast_date, "01/01/2026")
+        self.assertEqual(blast_time, "22:02:03")
+
     def test_fallback_plan_id_is_not_extracted_from_pdf(self):
         cfg = normalize_config(load_config(ROOT / "config.yaml"), ROOT)
         with TemporaryDirectory() as tmp:

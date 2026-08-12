@@ -17,6 +17,10 @@ Regras operacionais atuais:
 - A publicação no GitHub Pages deve operar sem inteligência artificial, chave de API ou serviço pago; o modo público processa os anexos localmente no navegador.
 - O site deve oferecer um campo opcional para informar o total de carga realizada em kg e, quando habilitado, distribuir a diferença entre os furos intermediários até fechar exatamente o total informado, preservando os extremos e validando alvos inviáveis.
 - A interface pública deve identificar as tabelas pelas colunas, validar a assinatura do PDF, rejeitar anexos duplicados/excessivos e gerar log local quando a validação falhar.
+- A interface pública deve orientar os cinco arquivos: Config Final.csv, Projeto Completo.csv, Historial da DRB, Plano de Perfuração.xlsx e Plano de Perfuração.pdf.
+- O histórico da DRB deve aceitar o padrão `*_histo.log`, com blocos `[StartProcedure]`, linhas `BP:` e eventos `[Fire]`.
+- O site deve oferecer conversão de fuso no processamento, com `UTC-03:00` como opção padrão e o resultado registrado no Excel.
+- O site deve disponibilizar os modelos “Modelo - Pré-Corte - SEM FUROS” e “Modelo - Produção” para download.
 
 Critério objetivo de conclusão:
 - o projeto possui documentação completa;

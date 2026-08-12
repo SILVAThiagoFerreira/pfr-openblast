@@ -11,10 +11,11 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 6. Exporta o Excel final com rastreabilidade.
 
 ## Entradas
-- `input/*PROJETO COMPLETO*.csv|xlsx`
-- `input/*CONFIG FINAL*.csv|xlsx`
-- `input/PP.pdf`
-- `input/HISTO-*.txt`
+- `input/*PROJETO COMPLETO*.csv|xlsx` — Projeto Completo.csv (QAQC do O-PitSurface)
+- `input/*CONFIG FINAL*.csv|xlsx` — Config Final.csv, exportado após Atualização dos Furos
+- `input/PP.pdf` — Plano de Perfuração.pdf
+- `input/PP*.xlsx` — Plano de Perfuração.xlsx
+- `input/HISTO-*.txt|*_histo.log` — histórico da DRB
 
 ## Saídas
 - `output/Plano_Fogo_Realizado_<PLANO>.xlsx`
@@ -47,6 +48,8 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - O HISTO é identificado pelo nome ou pela presença de eventos `[Fire]`; o PDF é validado pelo cabeçalho `%PDF-` antes do processamento.
 - Execuções temporárias com mais de 24 horas são removidas automaticamente.
 - Falhas de identificação do plano ou do evento `[Fire]` interrompem a execução; o sistema não usa a data/hora atual como substituição.
+- O histórico antigo `.txt` e o novo padrão `*_histo.log` são aceitos. No novo padrão, o plano é associado pelo bloco `[StartProcedure]` que contém a linha `BP:`, e o primeiro `[Fire]` desse bloco define o instante do desmonte.
+- A opção de fuso do site converte o horário do HISTO antes de gerar o Excel; `UTC-03:00` é o padrão para o horário local de Brasília.
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`.

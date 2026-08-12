@@ -53,12 +53,14 @@ Campos principais:
 - No site, o campo opcional de total de carga realizada fornece o alvo da execução atual e tem precedência sobre a configuração. O alvo deve ser positivo; quando habilitado, a soma final deve fechar no valor informado, com distribuição determinística nos furos intermediários e erro explícito para alvos inviáveis. Sem o campo habilitado, a regra pública permanece desativada.
 
 ## Historico de disparo
-Arquivo: `HISTO-*.txt`
+Arquivo: `HISTO-*.txt` ou `*_histo.log`
 
 Campos/eventos usados:
 - `[BlastingPlan]YYYY/MM/DD-HH:MM:SS` abre o bloco operacional carregado no detonador.
 - Linhas `PU...;PP<plano>;...` identificam o plano dentro do bloco, por exemplo `PP320526`.
 - `[Fire]YYYY/MM/DD-HH:MM:SS` define a data e hora do disparo somente quando vem depois do `[BlastingPlan]` que contém o plano correto.
+- `[StartProcedure]YYYY/MM/DD-HH:MM:SS` abre o bloco do novo padrão; linhas `BP: PP<plano>` identificam o plano e o primeiro `[Fire]` do bloco define a hora do desmonte.
+- Cabeçalhos com espaço depois de `]` e registros `BMO:`/`DELAYS:` são aceitos. Quando necessário, o offset selecionado (`-03:00`, por exemplo) é aplicado à data/hora antes da saída.
 - Numeros encontrados em listas de detonadores, testes ou falhas nao sao IDs de plano.
 
 ## Saída Excel

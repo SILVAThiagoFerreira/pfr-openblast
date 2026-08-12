@@ -9,13 +9,23 @@ Lista consolidada dos arquivos de entrada do modulo de plano de fogo realizado d
 - `pp.xlsx` -> plano de perfuracao de producao
 - `PP0250326.pdf` -> plano de perfuracao em PDF
 - `Consumo.png` -> dados de consumo do desmonte em imagem
-- `HISTO-*.txt` -> historico de log da DRB (blast box)
+- `Config Final.csv` -> arquivo de temporização exportado após Atualização dos Furos, com as quantidades iguais ao executado
+- `Projeto Completo.csv` -> arquivo de QAQC do O-PitSurface
+- `Plano de Perfuração.xlsx` -> planilha do plano de perfuração
+- `Plano de Perfuração.pdf` -> PDF do plano de perfuração
+- `HISTO-*.txt` ou `*_histo.log` -> histórico da DRB (blast box)
 - `template Excel .xls` -> template do plano de fogo realizado de producao
 
 ## Regra Atual Dos Tempos
 
 - os tempos dos furos passam a ser lidos de `previsto.csv`, pela coluna `DetonatingTime`
 - `timing.csv` nao e mais um arquivo obrigatorio do modulo de producao
+
+## Regra Atual Do Historico
+
+- O formato antigo `.txt` continua aceito.
+- O novo formato `*_histo.log` usa `[StartProcedure]`, linhas `BP:` e `[Fire]`; o primeiro `[Fire]` do bloco correspondente ao plano é usado.
+- O site permite converter o horário do HISTO para `UTC-03:00` antes de gerar o Excel.
 
 ## Pasta Esperada
 

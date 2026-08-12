@@ -141,7 +141,7 @@ Uso principal:
 - extrair quantidades de iniciadores e booster
 - extrair itens da tabela de regularizacao / blocos
 
-### 6. `data/inputs/producao_realizado/HISTO-*.txt`
+### 6. `data/inputs/producao_realizado/HISTO-*.txt` ou `*_histo.log`
 
 Log da blast box.
 
@@ -151,7 +151,8 @@ Uso principal:
 
 Regra atual:
 
-- usar o primeiro evento `[Fire]`
+- usar o primeiro evento `[Fire]` do bloco compatível; no novo padrão, o bloco é aberto por `[StartProcedure]` e identificado por `BP:`
+- aplicar o offset de fuso escolhido pelo usuário, quando informado (por exemplo, `-03:00`)
 - se nao houver log ou nao houver evento valido, usar `12:00:00`
 
 ### 7. Template Excel `.xls`
@@ -255,9 +256,11 @@ Funcao:
 
 Regra atual:
 
-- procura arquivos `HISTO-*.txt`
-- busca o primeiro evento `[Fire]YYYY/MM/DD-HH:MM:SS`
+- procura arquivos `HISTO-*.txt`, `HISTO-*.log` ou `*_histo.log`
+- busca o primeiro evento `[Fire]YYYY/MM/DD-HH:MM:SS` no bloco `[BlastingPlan]` ou `[StartProcedure]` compatível
+- reconhece espaços após `]` e linhas `BP:` no novo `.log`
 - usa a hora extraida como horario oficial do desmonte
+- converte o horário pelo offset selecionado antes de montar o Excel
 - fallback: `12:00:00`
 
 ### 6. Extrai texto do PDF de perfuracao
@@ -675,7 +678,7 @@ Isso significa que alguns indicadores nao sao 100 por cento oriundos de uma unic
 - `Burden` e `Spacing` do CSV ID = `previsto.csv`
 - `X`, `Y`, `Z`, `Angle`, `Azimuth` do CSV ID = `pp.xlsx`
 - `DetonatingTime` do CSV ID = `previsto.csv`, com inferencia para faltantes
-- horario do desmonte = primeiro `[Fire]` do log `HISTO-*.txt`, fallback `12:00:00`
+- horario do desmonte = primeiro `[Fire]` do log `HISTO-*.txt` ou `*_histo.log`, com conversão de fuso opcional
 - furo da capa = escolha aleatoria entre furos do plano final
 - `Data:` do cabecalho = sem hora
 

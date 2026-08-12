@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import re
 import hashlib
-from datetime import datetime
+import math
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -380,7 +382,18 @@ def extract_plan_id(plan_pdf: Path | None, histo_files: tuple[Path, ...], cfg: d
             pass
     for histo in histo_files:
         try:
-            match = regex.search(read_text(histo))
+            text = read_text(histo)
+            # O .log novo também contém números de seis ou mais dígitos em
+            # DELAYS, checksums e contadores. Um identificador explicitamente
+            # prefixado por PP tem precedência sobre esses números genéricos.
+            explicit_plan_ids = _PLAN_ID_PATTERN.findall(text)
+            for explicit_plan_id in explicit_plan_ids:
+                match = regex.search(explicit_plan_id)
+                if match:
+                    return match.group(1)
+                return explicit_plan_id[2:]
+
+            match = regex.search(text)
             if match:
                 return match.group(1)
         except Exception:
@@ -394,11 +407,113 @@ def extract_plan_id(plan_pdf: Path | None, histo_files: tuple[Path, ...], cfg: d
     raise ValueError("Não foi possível identificar o ID do plano nos anexos e não há fallback configurado.")
 
 
-def _format_histo_datetime(date_str: str, time_str: str) -> tuple[str, str]:
-    return datetime.strptime(date_str, "%Y/%m/%d").strftime("%d/%m/%Y"), time_str
+@dataclass(frozen=True)
+class _HistoEvent:
+    name: str
+    date: str
+    time: str
+    timestamp: datetime
+    body: str
+    file: Path
+    position: int
+
+
+_HISTO_EVENT_PATTERN = re.compile(
+    r"(?m)^[ \t]*\[(?P<name>[^\]\r\n]+)\][ \t]*"
+    r"(?P<date>\d{4}/\d{1,2}/\d{1,2})-(?P<time>\d{1,2}:\d{1,2}:\d{1,2})[^\r\n]*"
+)
 
 
 _PLAN_ID_PATTERN = re.compile(r"\bPP(?:[\s._/-]*\d){6,8}(?:[_-][A-Z])?\b", re.IGNORECASE)
+
+
+def _parse_timezone_offset(value: float | str | None) -> float:
+    if value is None or value == "":
+        return 0.0
+
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized.startswith("UTC"):
+            normalized = normalized[3:].strip()
+        if not normalized:
+            return 0.0
+
+        clock_match = re.fullmatch(r"(?P<sign>[+-]?)(?P<hours>\d{1,2}):(?P<minutes>[0-5]\d)", normalized)
+        if clock_match:
+            sign = -1 if clock_match.group("sign") == "-" else 1
+            parsed = sign * (int(clock_match.group("hours")) + int(clock_match.group("minutes")) / 60)
+        else:
+            try:
+                parsed = float(normalized)
+            except ValueError as exc:
+                raise ValueError(
+                    "O deslocamento de fuso deve ser um número de horas ou no formato ±HH:MM."
+                ) from exc
+    else:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "O deslocamento de fuso deve ser um número de horas ou no formato ±HH:MM."
+            ) from exc
+
+    if not math.isfinite(parsed) or abs(parsed) > 24:
+        raise ValueError("O deslocamento de fuso deve estar entre -24 e +24 horas.")
+    return parsed
+
+
+def _parse_histo_events(path: Path) -> list[_HistoEvent]:
+    text = read_text(path)
+    headers = list(_HISTO_EVENT_PATTERN.finditer(text))
+    events: list[_HistoEvent] = []
+    for index, header in enumerate(headers):
+        try:
+            timestamp = datetime.strptime(
+                f"{header.group('date')}-{header.group('time')}",
+                "%Y/%m/%d-%H:%M:%S",
+            )
+        except ValueError:
+            continue
+        body_end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        events.append(
+            _HistoEvent(
+                name=header.group("name").strip(),
+                date=header.group("date"),
+                time=header.group("time"),
+                timestamp=timestamp,
+                body=text[header.end():body_end],
+                file=path,
+                position=header.start(),
+            )
+        )
+    return events
+
+
+def _event_sort_key(event: _HistoEvent) -> tuple[datetime, float, str, int]:
+    try:
+        modified = event.file.stat().st_mtime
+    except OSError:
+        modified = 0.0
+    return event.timestamp, modified, event.file.name.casefold(), event.position
+
+
+def _format_histo_datetime(
+    date_str: str,
+    time_str: str,
+    timezone_offset_hours: float | str | None = 0.0,
+    *,
+    timezone_offset: float | str | None = None,
+) -> tuple[str, str]:
+    if timezone_offset is not None:
+        if timezone_offset_hours not in (None, 0, 0.0, "", "0", "+0", "-0"):
+            raise ValueError("Informe apenas um parâmetro de deslocamento de fuso.")
+        timezone_offset_hours = timezone_offset
+    offset = _parse_timezone_offset(timezone_offset_hours)
+    timestamp = datetime.strptime(
+        f"{date_str}-{time_str}",
+        "%Y/%m/%d-%H:%M:%S",
+    ) + timedelta(hours=offset)
+    return timestamp.strftime("%d/%m/%Y"), timestamp.strftime("%H:%M:%S")
 
 
 def _plan_id_signature(value: str) -> tuple[str, str] | None:
@@ -446,48 +561,96 @@ def extract_blast_datetime(
     histo_files: tuple[Path, ...],
     plan_id: str | None = None,
     allow_unmatched_plan_fallback: bool = False,
+    timezone_offset_hours: float | str | None = 0.0,
+    *,
+    timezone_offset: float | str | None = None,
 ) -> tuple[str, str]:
+    if timezone_offset is not None:
+        if timezone_offset_hours not in (None, 0, 0.0, "", "0", "+0", "-0"):
+            raise ValueError("Informe apenas um parâmetro de deslocamento de fuso.")
+        timezone_offset_hours = timezone_offset
+    offset = _parse_timezone_offset(timezone_offset_hours)
+
+    grouped_events = [
+        (file, _parse_histo_events(file))
+        for file in sorted(histo_files, key=lambda item: str(item).casefold())
+    ]
+
     if plan_id:
-        event_pattern = re.compile(r"\[(BlastingPlan|Fire)\](\d{4}/\d{2}/\d{2})-(\d{2}:\d{2}:\d{2})")
-        matches: list[tuple[str, str, str, str, str]] = []
-        for file in sorted(histo_files, key=lambda item: item.stat().st_mtime, reverse=True):
-            text = read_text(file)
-            events = list(event_pattern.finditer(text))
+        matches: list[tuple[str, _HistoEvent, _HistoEvent]] = []
+        for _, events in grouped_events:
             for index, event in enumerate(events):
-                if event.group(1) != "BlastingPlan":
+                if event.name == "BlastingPlan":
+                    matching_plan_ids = [
+                        candidate for candidate in _PLAN_ID_PATTERN.findall(event.body)
+                        if _plan_ids_match(plan_id, candidate)
+                    ]
+                    if not matching_plan_ids:
+                        continue
+
+                    next_plan_index = next(
+                        (
+                            candidate_index
+                            for candidate_index in range(index + 1, len(events))
+                            if events[candidate_index].name == "BlastingPlan"
+                        ),
+                        len(events),
+                    )
+                    fire = next(
+                        (candidate for candidate in events[index + 1:next_plan_index] if candidate.name == "Fire"),
+                        None,
+                    )
+                    if fire is not None:
+                        matches.append((matching_plan_ids[0], fire, event))
                     continue
-                next_event_start = events[index + 1].start() if index + 1 < len(events) else len(text)
-                block = text[event.start():next_event_start]
-                block_plan_ids = _PLAN_ID_PATTERN.findall(block)
-                matching_plan_ids = [candidate for candidate in block_plan_ids if _plan_ids_match(plan_id, candidate)]
+
+                if event.name != "StartProcedure":
+                    continue
+
+                matching_plan_ids = [
+                    candidate for candidate in _PLAN_ID_PATTERN.findall(event.body)
+                    if _plan_ids_match(plan_id, candidate)
+                ]
                 if not matching_plan_ids:
                     continue
-                for follow_event in events[index + 1:]:
-                    if follow_event.group(1) == "Fire":
-                        matches.append((matching_plan_ids[0], follow_event.group(2), follow_event.group(3), file.name, str(event.start())))
-                        break
+
+                next_procedure_index = next(
+                    (
+                        candidate_index
+                        for candidate_index in range(index + 1, len(events))
+                        if events[candidate_index].name in {"StartProcedure", "Stop", "PowerOn", "HistoryEnd"}
+                    ),
+                    len(events),
+                )
+                fires = [
+                    candidate for candidate in events[index + 1:next_procedure_index]
+                    if candidate.name == "Fire"
+                ]
+                if fires:
+                    # O primeiro Fire marca o início do disparo associado ao
+                    # StartProcedure; os demais podem ser registros por BMO.
+                    matches.append((matching_plan_ids[0], fires[0], event))
 
         same_month_matches = [match for match in matches if _plan_ids_match_same_month(plan_id, match[0])]
         viable_matches = same_month_matches or matches
         if len(viable_matches) > 1:
-            candidates = ", ".join(f"{match[0]} ({match[1]}-{match[2]})" for match in viable_matches)
+            candidates = ", ".join(
+                f"{match[0]} ({match[1].date}-{match[1].time})"
+                for match in viable_matches
+            )
             raise ValueError(f"Foram encontrados múltiplos blocos [BlastingPlan] compatíveis com o plano {plan_id}: {candidates}.")
         if viable_matches:
-            _, date_str, time_str, _, _ = viable_matches[0]
-            return _format_histo_datetime(date_str, time_str)
+            _, fire, _ = viable_matches[0]
+            return _format_histo_datetime(fire.date, fire.time, offset)
 
         if not allow_unmatched_plan_fallback:
             raise ValueError(f"Não foi encontrado no HISTO um disparo associado ao plano {plan_id}.")
 
-    events: list[tuple[str, str, str, int]] = []
-    for file in histo_files:
-        text = read_text(file)
-        for idx, match in enumerate(re.finditer(r"\[Fire\](\d{4}/\d{2}/\d{2})-(\d{2}:\d{2}:\d{2})", text)):
-            events.append((file.name, match.group(1), match.group(2), idx))
-    if not events:
+    fire_events = [event for _, events in grouped_events for event in events if event.name == "Fire"]
+    if not fire_events:
         raise ValueError("Não foi encontrado nenhum evento [Fire] válido nos arquivos HISTO.")
-    file_name, date_str, time_str, _ = sorted(events, reverse=True)[0]
-    return _format_histo_datetime(date_str, time_str)
+    latest_fire = max(fire_events, key=_event_sort_key)
+    return _format_histo_datetime(latest_fire.date, latest_fire.time, offset)
 
 
 def load_project_frame(path: Path) -> pd.DataFrame:
@@ -607,6 +770,7 @@ def build_summary(merged: pd.DataFrame, data: pd.DataFrame, plan_id: str, blast_
         ["Plano", plan_id],
         ["Data", blast_date],
         ["Hora", blast_time],
-
     ]
+    if sources.get("timezone_offset") is not None:
+        rows.append(["Fuso do HISTO", sources["timezone_offset"]])
     return pd.DataFrame(rows, columns=["Campo", "Valor"])

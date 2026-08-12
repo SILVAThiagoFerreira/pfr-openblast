@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 from .config import load_config
 from .pipeline import run
 
-ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xlsm", ".pdf", ".txt"}
+ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xlsm", ".pdf", ".txt", ".log"}
 MAX_FILE_SIZE = 250 * 1024 * 1024
 MAX_FILES_PER_RUN = 20
 
@@ -82,7 +82,11 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
                 saved_files.append(filename)
 
             config_path = _build_run_config(default_config, project_root, input_root, output_root, run_root)
-            result = run(config_path)
+            requested_timezone = request.form.get("timezoneOffset") or request.form.get("timezone_offset")
+            if requested_timezone and requested_timezone != "none":
+                result = run(config_path, timezone_offset=requested_timezone)
+            else:
+                result = run(config_path)
             return jsonify({
                 "run_id": run_id,
                 "plan_id": result.plan_id,
@@ -92,6 +96,7 @@ def create_app(project_root: Path, default_config: Path) -> Flask:
                 "total_emulsion_kg": result.total_emulsion_kg,
                 "max_charge_per_delay_kg": result.max_charge_per_delay_kg,
                 "max_charge_delay_ms": result.max_charge_delay_ms,
+                "timezone_offset": requested_timezone or "none",
                 "files": saved_files,
                 "download_url": f"/api/download/{run_id}/{secure_filename(result.output_path.name)}",
             })

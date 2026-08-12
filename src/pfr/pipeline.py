@@ -31,7 +31,17 @@ def configure_logging(cfg: dict) -> logging.Logger:
     return logging.getLogger("pfr")
 
 
-def run(config_path: Path) -> RunResult:
+def run(
+    config_path: Path,
+    timezone_offset_hours: float | str | None = None,
+    *,
+    timezone_offset: float | str | None = None,
+) -> RunResult:
+    if timezone_offset is not None:
+        if timezone_offset_hours not in (None, 0, 0.0, "", "0", "+0", "-0"):
+            raise ValueError("Informe apenas um parâmetro de deslocamento de fuso.")
+        timezone_offset_hours = timezone_offset
+
     root = Path(__file__).resolve().parents[2]
     raw = load_config(config_path)
     cfg = normalize_config(raw, root)
@@ -45,11 +55,19 @@ def run(config_path: Path) -> RunResult:
     backup_inputs([sources.project, sources.final, sources.plan_pdf, *sources.histo_files], cfg["paths"]["backup_root"])
 
     plan_id = extract_plan_id(sources.plan_pdf, sources.histo_files, cfg, sources)
+    if timezone_offset_hours is None:
+        timezone_offset_hours = cfg["business"].get(
+            "histo_timezone_offset_hours",
+            cfg["business"].get("histo_timezone_offset", 0),
+        )
     blast_date, blast_time = extract_blast_datetime(
         sources.histo_files,
         plan_id,
         allow_unmatched_plan_fallback=cfg["business"].get("allow_unmatched_plan_fire_fallback", False),
+        timezone_offset_hours=timezone_offset_hours,
     )
+    if timezone_offset_hours not in (None, 0, 0.0, "", "0", "+0", "-0"):
+        logger.info("Deslocamento aplicado ao horário do HISTO: %s", timezone_offset_hours)
 
     project = load_project_frame(sources.project)
     final = load_final_frame(sources.final)
@@ -66,6 +84,7 @@ def run(config_path: Path) -> RunResult:
         "project": sources.project,
         "final": sources.final,
         "plan_pdf": sources.plan_pdf,
+        "timezone_offset": str(timezone_offset_hours) if timezone_offset_hours not in (None, 0, 0.0, "", "0", "+0", "-0") else "horário original do HISTO",
     })
 
     output_name = cfg["business"]["output_name_template"].format(plan_id=plan_id)

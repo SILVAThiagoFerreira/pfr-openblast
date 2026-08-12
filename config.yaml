@@ -22,6 +22,8 @@ inputs:
       - "PP.pdf"
     histo_patterns:
       - "HISTO-*.txt"
+      - "HISTO-*.log"
+      - "*_histo.log"
 
 business:
   output_type_label: "producao"

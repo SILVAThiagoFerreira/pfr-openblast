@@ -50,6 +50,47 @@ class WebTest(unittest.TestCase):
             payload = response.get_json()
             self.assertEqual(app.test_client().get(payload["download_url"]).status_code, 200)
 
+    def test_generate_accepts_standard_histo_log_upload(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root / "config.yaml"
+            config.write_text("paths: {}\n", encoding="utf-8")
+            app = create_app(root, config)
+
+            def fake_run(config_path):
+                output = Path(config_path).parent / "output" / "output.xlsx"
+                output.write_bytes(b"PK-test")
+                return RunResult(output, "123", "01/01/2026", "12:00:00", 1, 2.0, 2.0, 1.0)
+
+            with patch("pfr.web.run", side_effect=fake_run):
+                response = app.test_client().post(
+                    "/api/generate",
+                    data={"inputs": (io.BytesIO(b"[HistoryEnd]\n"), "bm-0322110826-1408_histo.log")},
+                    content_type="multipart/form-data",
+                )
+
+            self.assertEqual(response.status_code, 200)
+
+    def test_generate_passes_timezone_offset_to_pipeline(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root / "config.yaml"
+            config.write_text("paths: {}\n", encoding="utf-8")
+            app = create_app(root, config)
+            output_path = root / "output.xlsx"
+            output_path.write_bytes(b"PK-test")
+            result = RunResult(output_path, "123", "01/01/2026", "09:00:00", 1, 2.0, 2.0, 1.0)
+            with patch("pfr.web.run", return_value=result) as mocked_run:
+                response = app.test_client().post(
+                    "/api/generate",
+                    data={"inputs": (io.BytesIO(b"a"), "input.csv"), "timezoneOffset": "-03:00"},
+                    content_type="multipart/form-data",
+                )
+            self.assertEqual(response.status_code, 200)
+            mocked_run.assert_called_once()
+            self.assertEqual(mocked_run.call_args.kwargs["timezone_offset"], "-03:00")
+            self.assertEqual(response.get_json()["timezone_offset"], "-03:00")
+
     def test_health_endpoint_is_json(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
