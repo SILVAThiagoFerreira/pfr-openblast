@@ -40,6 +40,7 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /id="manual-fire-time"/);
   assert.match(html, /for="manual-fire-time"[^>]*>Horário local do desmonte/);
   assert.match(html, /id="manual-fire-time-error"/);
+  assert.match(html, /obrigatório sem o Historial da DRB/);
   assert.match(html, /id="force-submit"[^>]*>Forçar execução/);
   assert.match(html, /force-execution\.css/);
   assert.match(html, /\.\/modelos\/modelo-pre-corte-sem-furos\.xlsx/);
@@ -53,6 +54,10 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /manualFireTime/);
   assert.match(app, /12:00:00/);
   assert.match(app, /MISSING_FIRE_TIME/);
+  assert.match(app, /allowMissingHistory/);
+  assert.match(app, /historySource === 'missing'/);
+  assert.match(app, /dateSource === 'browser'/);
+  assert.match(app, /data local do navegador/);
   assert.match(app, /runGeneration\(true\)/);
 }
 

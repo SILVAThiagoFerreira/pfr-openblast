@@ -63,6 +63,19 @@ assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(missingFire
 assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(missingFireHistory, ['440726'], { force: true }))), {
   planId: '440726', date: '04/08/2026', time: '12:00:00', forced: true, timeSource: 'force-default'
 });
+const missingHistory = '';
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(missingHistory, ['550926'], {
+  force: true, manualPlanId: '550926', manualFireTime: '12:00', allowMissingHistory: true, fallbackDate: '2026/09/11'
+}))), {
+  planId: '550926', date: '11/09/2026', time: '12:00:00', forced: true,
+  timeSource: 'manual', dateSource: 'browser', historySource: 'missing'
+});
+assert.throws(() => planId.resolvePlanAndFire(missingHistory, ['550926'], {
+  force: true, manualPlanId: '550926', allowMissingHistory: true, fallbackDate: '2026/09/11'
+}), error => error.code === 'MISSING_FIRE_TIME' && /Historial da DRB não foi anexado/.test(error.message));
+assert.throws(() => planId.resolvePlanAndFire(missingHistory, [], {
+  force: true, manualFireTime: '12:00', allowMissingHistory: true, fallbackDate: '2026/09/11'
+}), error => error.code === 'MISSING_PLAN_ID');
 assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(dbdHistory, ['440726'], { force: true }))), {
   planId: '440726', date: '04/08/2026', time: '15:05:22', forced: true
 });

@@ -154,7 +154,7 @@ Regra atual:
 - usar o primeiro evento `[Fire]` do bloco compatível; o parser aceita `[BlastingPlan]` e `[BlastPlan]`, além de cabeçalhos com data completa ou somente `HH:MM:SS`
 - quando o cabeçalho traz somente o horário, herdar a última data completa do histórico
 - aplicar o offset de fuso escolhido pelo usuário somente ao horário lido do HISTO
-- se o horário não for identificável, solicitar o horário local; na execução forçada sem preenchimento, usar `12:00:00` local
+- se o horário não for identificável, solicitar o horário local; sem HISTO, a execução forçada exige esse horário e usa a data local do navegador; com HISTO sem `[Fire]` legível, o fallback forçado `12:00:00` continua explícito
 
 ### 7. Template Excel `.xls`
 
@@ -264,7 +264,7 @@ Regra atual:
 - usa a hora extraida como horario oficial do desmonte
 - converte o horário lido pelo offset selecionado antes de montar o Excel
 - horário manual: usado como horário local sem nova conversão
-- fallback da execução forçada: `12:00:00` local, registrado como sintético no resumo
+- fallback da execução forçada com HISTO sem `[Fire]` legível: `12:00:00` local, registrado como sintético no resumo; sem HISTO, usar o horário informado pelo usuário e registrar a data local do navegador
 
 ### 6. Extrai texto do PDF de perfuracao
 

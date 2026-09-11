@@ -53,7 +53,7 @@ Campos principais:
 - No site, o campo opcional de total de carga realizada fornece o alvo da execução atual e tem precedência sobre a configuração. O alvo deve ser positivo; quando habilitado, a soma final deve fechar no valor informado, com distribuição determinística nos furos intermediários e erro explícito para alvos inviáveis. Sem o campo habilitado, a regra pública permanece desativada.
 
 ## Historico de disparo
-Arquivo: `HISTO-*.txt` ou `*_histo.log`
+Arquivo: `HISTO-*.txt` ou `*_histo.log`; obrigatório no modo automático e opcional no modo forçado
 
 Campos/eventos usados:
 - `[BlastingPlan]YYYY/MM/DD-HH:MM:SS` abre o bloco operacional carregado no detonador.
@@ -62,6 +62,7 @@ Campos/eventos usados:
 - `[StartProcedure]YYYY/MM/DD-HH:MM:SS` abre o bloco do novo padrão; linhas `BP: PP<plano>` identificam o plano e o primeiro `[Fire]` do bloco define a hora do desmonte.
 - Cabeçalhos com espaço depois de `]` e registros `BMO:`/`DELAYS:` são aceitos. Quando necessário, o offset selecionado (`-03:00`, por exemplo) é aplicado à data/hora antes da saída.
 - Numeros encontrados em listas de detonadores, testes ou falhas nao sao IDs de plano.
+- Sem HISTO, a execução forçada exige `manualFireTime`, usa a data local do navegador e registra `historySource: missing` e `dateSource: browser`; o horário informado pelo usuário é local e não recebe conversão de fuso.
 
 ## Saída Excel
 Abas:
@@ -74,4 +75,4 @@ Colunas principais em `Dados dos Furos`:
 ## Metadados de identificação
 IDs de plano podem aparecer como `PP370626`, `PP0370626` ou com separadores. A composição é `PLANO;MÊS;ANO`: os quatro últimos dígitos são mês e ano, e o trecho anterior é o plano. Para comparação, o prefixo e os separadores são removidos, zeros à esquerda do plano são ignorados, o ano deve ser igual e o mês é ignorado para permitir detonação em mês posterior ou anterior ao mês de emissão. A forma encontrada no HISTO é mantida como o ID do evento na saída. Se houver múltiplos blocos compatíveis, o mês coincidente tem prioridade; sem desempate único, a validação falha por ambiguidade.
 
-O novo padrão também aceita marcadores `BP:440826` e `BP: PP440826`. No modo online, `Identificação informada`, `Modo de execução` e, quando aplicável, `ID identificado no HISTO` são gravados na aba `Resumo`; a execução forçada não desativa as validações de estrutura ou temporização.
+O novo padrão também aceita marcadores `BP:440826` e `BP: PP440826`. No modo online, `Identificação informada`, `Modo de execução`, `Fonte da data`, `Historial da DRB` e, quando aplicável, `ID identificado no HISTO` são gravados na aba `Resumo`; a execução forçada não desativa as validações de estrutura ou temporização.

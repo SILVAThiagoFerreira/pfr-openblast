@@ -8,7 +8,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Realizado: `Config Final.csv` (`*CONFIG FINAL*`), exportado após Atualização dos Furos
 - Plano Excel: `Plano de Perfuração.xlsx`
 - Plano PDF: `Plano de Perfuração.pdf` (`PP*.pdf` ou `PP.pdf`)
-- Histórico da DRB: `.txt` ou novo padrão `*_histo.log`
+- Histórico da DRB: `.txt` ou novo padrão `*_histo.log`; obrigatório no modo automático e opcional no modo forçado
 
 ## Regras
 - O ID do plano deve ser resolvido de forma auditável. O sistema tenta extrair o ID nesta ordem: (1) regex configurado no conteúdo do PDF, (2) regex configurado no conteúdo do HISTO, (3) padrão PP nos nomes dos arquivos de entrada, (4) `business.fallback_plan_id`. O modo `"auto"` habilita todas as fontes; o modo `"fallback"` usa apenas nomes de arquivo e fallback.
@@ -37,17 +37,17 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
 - No site, rejeitar alvo ausente, não numérico ou menor/igual a zero; rejeitar também alvos que não possam ser distribuídos entre os limites preservados, com mensagem clara antes do download.
 - Validar que todos os tempos de detonação exportados sejam inteiros, não negativos, preenchidos e únicos.
-- Abort ar com erro claro se algo crítico faltar.
+- Abortar com erro claro se algo crítico faltar. No modo automático, o HISTO e um evento `[Fire]` identificável são obrigatórios. No modo forçado, o HISTO pode ser omitido somente quando houver um ID de plano válido e o usuário informar o horário local do desmonte; nesse caso, a data usada é a data local do navegador no momento da execução.
 
 ## Identificação pública do plano
 No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`. O prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade do plano. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que tenha o mesmo plano e ano das pistas dos arquivos/tabelas anexados, mesmo quando o mês de emissão for diferente do mês da detonação.
 
 O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado.
 
-Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e ignora somente a divergência de identificação; colunas, PDF, furos e temporizações continuam sendo validados.
+Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e pode ignorar a divergência de identificação ou a ausência total do HISTO. Sem HISTO, o horário local informado no site e a data local do navegador são usados, sem conversão adicional de fuso; o ID, as colunas, o PDF, os furos e as temporizações continuam sendo validados.
 
 ## Determinismo
 - Ordenação por `Number`.
 - Formatos e nomes fixos via configuração.
 - Backup por timestamp.
-- Plano, data e hora devem ser reprodutíveis a partir de `config.yaml` e do bloco correspondente no `HISTO-*.txt`.
+- Plano, data e hora devem ser reprodutíveis a partir de `config.yaml` e do bloco correspondente no `HISTO-*.txt`; na execução forçada sem HISTO, o resumo registra o ID, o horário informado e a data local do navegador usados como fontes alternativas.

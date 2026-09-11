@@ -15,7 +15,7 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 - `input/*CONFIG FINAL*.csv|xlsx` — Config Final.csv, exportado após Atualização dos Furos
 - `input/PP.pdf` — Plano de Perfuração.pdf
 - `input/PP*.xlsx` — Plano de Perfuração.xlsx
-- `input/HISTO-*.txt|*_histo.log` — histórico da DRB
+- `input/HISTO-*.txt|*_histo.log` — histórico da DRB, obrigatório na validação automática e opcional na execução forçada
 
 ## Saídas
 - `output/Plano_Fogo_Realizado_<PLANO>.xlsx`
@@ -47,14 +47,14 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - As tabelas são identificadas pelas colunas obrigatórias, portanto o usuário pode renomear os arquivos sem quebrar a operação.
 - O HISTO é identificado pelo nome ou pela presença de eventos `[Fire]`; o PDF é validado pelo cabeçalho `%PDF-` antes do processamento.
 - Execuções temporárias com mais de 24 horas são removidas automaticamente.
-- Falhas de identificação do plano ou do evento `[Fire]` interrompem a validação automática; o sistema não usa a data/hora atual como substituição.
+- Falhas de identificação do plano ou do evento `[Fire]` interrompem a validação automática; o sistema não usa a data/hora atual como substituição automática.
 - O histórico antigo `.txt`, o padrão `*_histo.log` e o log DBD `BMO-*_history_DBD.log` são aceitos. O parser reconhece `[BlastingPlan]` e `[BlastPlan]`, além de eventos com data completa ou somente `HH:MM:SS`, herdando a última data completa do histórico.
-- Se o horário do `[Fire]` não puder ser identificado, a tela solicita o horário local do desmonte. Na execução forçada, quando o campo estiver vazio, o sistema usa `12:00:00` local, registra o fallback no resumo e não aplica nova conversão de fuso a esse horário sintético.
+- Se o horário do `[Fire]` não puder ser identificado, a tela solicita o horário local do desmonte. Quando o HISTO não for anexado, o botão **Forçar execução** exige esse horário informado pelo usuário; a data usada é a data local do navegador no momento da execução. Se houver HISTO, mas nenhum horário `[Fire]` legível, a execução forçada sem preenchimento mantém o fallback explícito `12:00:00` local. Horários manuais e esse fallback não sofrem nova conversão de fuso.
 - A opção de fuso do site converte somente o horário lido do HISTO antes de gerar o Excel; `UTC-03:00` é o padrão para o horário local de Brasília.
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`.
-- O campo opcional `ID / nome do plano de fogo em trabalho` permite informar a identificação desejada para o Excel. O campo `Horário local do desmonte` permite corrigir uma ausência ou ambiguidade de horário. Quando a divergência for somente entre meses do ID, o botão `Forçar execução` pede confirmação, mantém as validações operacionais e registra o ID informado, o ID do HISTO e a fonte do horário no resumo/log.
+- O campo opcional `ID / nome do plano de fogo em trabalho` permite informar a identificação desejada para o Excel. O campo `Horário local do desmonte` permite corrigir uma ausência ou ambiguidade de horário. Quando a divergência for somente entre meses do ID ou o HISTO não for anexado, o botão `Forçar execução` pede confirmação, mantém as validações operacionais e registra o ID informado, a fonte do horário, a fonte da data e a ausência do histórico no resumo/log.
 
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.

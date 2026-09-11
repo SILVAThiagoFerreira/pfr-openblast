@@ -24,7 +24,7 @@
       <div class="input-tutorial__intro">
         <span class="eyebrow red">TUTORIAL DE ENTRADAS</span>
         <h2 id="input-tutorial-title">Separe estes cinco arquivos antes de começar</h2>
-        <p>Use os arquivos do mesmo plano e confira os nomes e formatos abaixo. O histórico da DRB pode ser enviado como TXT ou LOG.</p>
+        <p>Use os arquivos do mesmo plano e confira os nomes e formatos abaixo. O histórico da DRB é recomendado, mas pode ser omitido na execução forçada quando o horário local for informado no site.</p>
       </div>
       <ol class="input-tutorial__list">
         <li class="input-tutorial__item"><span class="number">01</span><div><strong>Config Final.csv</strong><p>Arquivo de temporização exportado em CSV após a Atualização dos Furos, para que as quantidades estejam iguais ao executado.</p></div></li>
@@ -50,9 +50,9 @@
       </fieldset>
       <fieldset class="fire-time-settings">
         <legend>Horário do desmonte</legend>
-        <label for="manual-fire-time">Horário local do desmonte (se não for identificado)</label>
+        <label for="manual-fire-time">Horário local do desmonte (obrigatório sem o Historial da DRB)</label>
         <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
-        <p id="manual-fire-time-help" class="field-help">Normalmente o horário é lido do <code>[Fire]</code>. Use este campo se o HISTO não trouxer um horário legível ou se houver vários disparos e você quiser indicar o correto. Esse valor já é horário local e não sofre nova conversão de fuso.</p>
+        <p id="manual-fire-time-help" class="field-help">Normalmente o horário é lido do <code>[Fire]</code>. Se você não anexar o Historial da DRB, informe aqui o horário local e use “Forçar execução”. Esse valor não sofre nova conversão de fuso.</p>
         <p id="manual-fire-time-error" class="field-error" role="alert" hidden></p>
       </fieldset>
       <fieldset class="timezone-settings">
@@ -84,7 +84,7 @@
       <div class="generation-actions">
         <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
         <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span>→</span></button>
-        <p id="force-help" class="field-help force-help">Use quando a diferença do ID ou a ausência de horário no HISTO for explicada pelo contexto do desmonte. Se o horário estiver vazio, a execução forçada usará 12:00:00 local. As outras validações permanecem obrigatórias.</p>
+        <p id="force-help" class="field-help force-help">Use quando a diferença do ID ou a ausência do histórico for explicada pelo contexto do desmonte. Sem o Historial da DRB, informe o horário acima; a data será a data local do navegador. As outras validações permanecem obrigatórias.</p>
       </div>
       <div id="progress" class="progress" hidden aria-live="polite"><div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
     </form>
@@ -101,6 +101,6 @@
   </main>
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js"></script><script src="./plan-id.js?v=20260812-histo-fire"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./timezone.js?v=20260812"></script><script src="./app.js?v=20260812-histo-fire"></script>
+  <script src="./config.js"></script><script src="./plan-id.js?v=20260911-force-no-histo"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./timezone.js?v=20260812"></script><script src="./app.js?v=20260911-force-no-histo"></script>
 </body>
 </html>

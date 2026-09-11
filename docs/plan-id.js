@@ -81,6 +81,11 @@
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
   }
 
+  function browserLocalDate() {
+    const now = new Date();
+    return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+  }
+
   function planError(message, code) {
     const error = new Error(message);
     if (code) error.code = code;
@@ -179,6 +184,27 @@
     return event;
   }
 
+  function missingHistoryPlanAndFire(normalizedHints, manualPlanId, manualFireTime, fallbackDate) {
+    const hintValues = [...normalizedHints];
+    if (!manualPlanId && hintValues.length > 1) {
+      throw planError(`Sem HISTO, informe manualmente o ID do plano quando os anexos apresentarem IDs diferentes (${hintValues.join(', ')}).`, 'MULTIPLE_PLAN_HINTS');
+    }
+    const planId = manualPlanId || hintValues[0] || '';
+    if (!planId) throw planError('Informe o ID numérico do plano ou envie um anexo com o ID do plano antes de forçar a execução.', 'MISSING_PLAN_ID');
+    if (!manualFireTime) {
+      throw planError('O Historial da DRB não foi anexado. Informe o horário local do desmonte no site para forçar a execução.', 'MISSING_FIRE_TIME');
+    }
+    return {
+      planId,
+      date: formatDate(normalizeDatePart(fallbackDate) || browserLocalDate()),
+      time: manualFireTime,
+      forced: true,
+      timeSource: 'manual',
+      dateSource: 'browser',
+      historySource: 'missing'
+    };
+  }
+
   function forcedPlanAndFire(text, events, blocks, normalizedHints, manualPlanId, manualFireTime) {
     const fires = events.filter(event => event[1] === 'Fire' && event[3]);
     const hintValues = [...normalizedHints];
@@ -223,6 +249,9 @@
       }
     }
     const source = String(text ?? '');
+    if (!source.trim() && options.force && options.allowMissingHistory) {
+      return missingHistoryPlanAndFire(normalizedHints, manualPlanId, manualFireTime, options.fallbackDate);
+    }
     const events = parseHistoryEvents(source);
     const blocks = historyBlocks(source, events);
     const matches = blocks.flatMap(block => {
