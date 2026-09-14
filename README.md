@@ -53,8 +53,12 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - A opção de fuso do site converte somente o horário lido do HISTO antes de gerar o Excel; `UTC-03:00` é o padrão para o horário local de Brasília.
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
-- Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`.
+- Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`; se a geração for acionada sem anexos, informa o próximo passo no próprio resultado, sem iniciar processamento vazio.
 - O campo opcional `ID / nome do plano de fogo em trabalho` permite informar a identificação desejada para o Excel. O campo `Horário local do desmonte` permite corrigir uma ausência ou ambiguidade de horário. Quando a divergência for somente entre meses do ID ou o HISTO não for anexado, o botão `Forçar execução` pede confirmação, mantém as validações operacionais e registra o ID informado, a fonte do horário, a fonte da data e a ausência do histórico no resumo/log.
+
+### Organização da interface online
+
+O fluxo público é organizado em uma única área operacional: o tutorial dos cinco tipos de entrada, as opções de saída e os modelos de apoio ficam recolhíveis para manter a tela compacta. A identificação e o horário permanecem visíveis, enquanto fuso e distribuição de carga ficam em opções avançadas. Os anexos continuam incrementais e o log considera a lista completa de arquivos já adicionados.
 
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.

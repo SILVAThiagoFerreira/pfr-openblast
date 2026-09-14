@@ -103,7 +103,7 @@ drop.addEventListener('drop', e => appendFiles([...e.dataTransfer.files]));
 syncActionControls();
 
 function makeClientLog(error, options = {}) {
-  const files = [...input.files].map(file => file.name).join('\n') || '-';
+  const files = attachedFiles.map(file => file.name).join('\n') || '-';
   const offset = timezoneOffset?.value || 'none';
   const identity = options.planIdentity?.raw || '-';
   const fireTime = options.manualFireTime || '-';
@@ -425,7 +425,19 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
 }
 
 async function runGeneration(force = false) {
-  if (!attachedFiles.length) return;
+  if (!attachedFiles.length) {
+    result.className = 'result error';
+    result.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = 'Nenhum arquivo selecionado';
+    const message = document.createElement('p');
+    message.textContent = 'Anexe os arquivos do plano para continuar.';
+    result.append(title, message);
+    result.hidden = false;
+    statusText.textContent = 'Aguardando arquivos';
+    result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
   const planIdentity = readPlanIdentity();
   const generationOptions = { force, planIdentity };
   button.disabled = true; if (forceButton) forceButton.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');

@@ -30,6 +30,8 @@ Critério objetivo de conclusão:
 
 ## Atualização do modo online
 - Permitir inclusão e remoção incremental de anexos sem reiniciar a seleção.
+- Manter uma área operacional compacta, com tutorial, opções avançadas e modelos recolhíveis, sem remover os controles funcionais nem as orientações essenciais.
+- Ao iniciar a geração sem anexos, informar o estado vazio e orientar o usuário a anexar os arquivos do plano.
 - Reconhecer variações do ID do plano no HISTO, no nome do arquivo e nas tabelas, incluindo zeros à esquerda, separadores e meses diferentes para o mesmo plano/ano, com bloqueio de ambiguidades.
 - Disponibilizar o campo `ID / nome do plano de fogo em trabalho` para identificação manual e o botão confirmado `Forçar execução` para divergências explicáveis pelo mês de emissão/desmonte ou ausência do HISTO, preservando as demais validações.
 - Quando o HISTO não for anexado, exigir o horário local informado no site e usar a data local do navegador; registrar no Excel e no log a identificação manual, o modo forçado, a fonte do horário, a fonte da data e a ausência do HISTO.

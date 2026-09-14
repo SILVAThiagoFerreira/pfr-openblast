@@ -3,104 +3,190 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Geração online do Plano de Fogo Realizado em Excel.">
+  <meta name="description" content="Geração local do Plano de Fogo Realizado em Excel.">
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
-  <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./force-execution.css?v=20260812">
+  <link rel="stylesheet" href="./styles.css?v=20260914-compact-ui">
+  <link rel="stylesheet" href="./force-execution.css?v=20260914-compact-ui">
 </head>
 <body>
   <header class="openblast-hubbar" aria-label="Identidade OpenBlast">
-    <div class="openblast-hubbar__brand"><img src="./assets/openblast-logo.png" alt="OpenBlast"><span>Open<strong>Blast</strong></span></div>
+    <div class="openblast-hubbar__brand">
+      <img src="./assets/openblast-logo.png" alt="OpenBlast">
+      <span>Open<strong>Blast</strong></span>
+    </div>
     <span class="openblast-hubbar__title">Plano de Fogo Realizado</span>
   </header>
+
   <main class="shell">
-    <section class="hero">
-      <div><span class="eyebrow red">ONLINE</span><h2>Gerar Plano de Fogo Realizado - *.XLSX</h2><p>Processamento Local</p></div>
-      <div class="status"><span id="status-dot"></span><span id="status-text">Pronto para processar</span></div>
-    </section>
-
-    <section class="input-tutorial" aria-labelledby="input-tutorial-title">
-      <div class="input-tutorial__intro">
-        <span class="eyebrow red">TUTORIAL DE ENTRADAS</span>
-        <h2 id="input-tutorial-title">Separe estes cinco arquivos antes de começar</h2>
-        <p>Use os arquivos do mesmo plano e confira os nomes e formatos abaixo. O histórico da DRB é recomendado, mas pode ser omitido na execução forçada quando o horário local for informado no site.</p>
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero__copy">
+        <span class="eyebrow red">PROCESSAMENTO LOCAL</span>
+        <h1 id="page-title">Gerar plano de fogo realizado</h1>
+        <p>Reúna as entradas do mesmo desmonte, valide os dados e baixe o Excel rastreável.</p>
       </div>
-      <ol class="input-tutorial__list">
-        <li class="input-tutorial__item"><span class="number">01</span><div><strong>Config Final.csv</strong><p>Arquivo de temporização exportado em CSV após a Atualização dos Furos, para que as quantidades estejam iguais ao executado.</p></div></li>
-        <li class="input-tutorial__item"><span class="number">02</span><div><strong>Projeto Completo.csv</strong><p>Arquivo de QAQC do O-PitSurface.</p></div></li>
-        <li class="input-tutorial__item"><span class="number">03</span><div><strong>Historial da DRB</strong><p>Histórico exportado pela DRB em <code>.txt</code> ou <code>.log</code>, com <code>BlastPlan</code>/<code>StartProcedure</code> e <code>[Fire]</code>. O padrão DBD pode trazer o horário como <code>HH:MM:SS</code>; a data é herdada do último evento datado.</p></div></li>
-        <li class="input-tutorial__item"><span class="number">04</span><div><strong>Plano de Perfuração.xlsx</strong><p>Planilha do Plano de Perfuração correspondente ao desmonte.</p></div></li>
-        <li class="input-tutorial__item"><span class="number">05</span><div><strong>Plano de Perfuração.pdf</strong><p>PDF do Plano de Perfuração para conferência.</p></div></li>
-      </ol>
+      <div class="status" role="status" aria-live="polite">
+        <span id="status-dot" aria-hidden="true"></span>
+        <span id="status-text">Online</span>
+      </div>
     </section>
 
-    <form id="form" class="workspace" novalidate>
+    <details class="input-tutorial" aria-labelledby="input-tutorial-title">
+      <summary class="input-tutorial__summary">
+        <span class="summary-icon" aria-hidden="true">i</span>
+        <span>
+          <strong id="input-tutorial-title">O que anexar</strong>
+          <span class="summary-note">Arquivos do mesmo plano · Historial da DRB recomendado</span>
+        </span>
+        <span class="summary-chevron" aria-hidden="true">⌄</span>
+      </summary>
+      <div class="input-tutorial__body">
+        <p class="input-tutorial__lead">Todos os arquivos devem pertencer ao mesmo plano.</p>
+        <ol class="input-tutorial__list">
+          <li class="input-tutorial__item">
+            <span class="number">01</span>
+            <div><strong>Config Final.csv</strong><span>Temporização e carga executadas.</span></div>
+          </li>
+          <li class="input-tutorial__item">
+            <span class="number">02</span>
+            <div><strong>Projeto Completo.csv</strong><span>Dados de QAQC do O-PitSurface.</span></div>
+          </li>
+          <li class="input-tutorial__item">
+            <span class="number">03</span>
+            <div><strong>Historial da DRB</strong><span><code>.txt</code> ou <code>.log</code> com <code>[Fire]</code>; opcional na execução forçada.</span></div>
+          </li>
+          <li class="input-tutorial__item">
+            <span class="number">04</span>
+            <div><strong>Plano de Perfuração.xlsx</strong><span>Planilha correspondente ao desmonte.</span></div>
+          </li>
+          <li class="input-tutorial__item">
+            <span class="number">05</span>
+            <div><strong>Plano de Perfuração.pdf</strong><span>Conferência do plano de perfuração.</span></div>
+          </li>
+        </ol>
+      </div>
+    </details>
+
+    <form id="form" class="workspace" novalidate aria-labelledby="workspace-title">
+      <div class="workspace__heading">
+        <div>
+          <span class="step-label">Etapa 1</span>
+          <h2 id="workspace-title">Anexe os arquivos</h2>
+        </div>
+        <span class="workspace__hint">O processamento acontece neste navegador.</span>
+      </div>
+
       <label id="dropzone" class="dropzone" for="inputs">
         <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt,.log" required>
-        <span class="upload-icon">↑</span><strong>Anexe os arquivos de entrada</strong>
-        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT e LOG</span>
+        <span class="upload-icon" aria-hidden="true">↑</span>
+        <strong>Escolha os arquivos do plano</strong>
+        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT ou LOG</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
-      <fieldset class="plan-identity-settings">
-        <legend>Identificação do plano</legend>
-        <label for="plan-identity">ID / nome do plano de fogo em trabalho</label>
-        <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou Plano 440726" aria-describedby="plan-identity-help">
-        <p id="plan-identity-help" class="field-help">Opcional. Informe o ID do plano que deve ser gravado no Excel. O sistema aceita o ID com ou sem <code>PP</code>; o nome livre fica registrado no resumo.</p>
-      </fieldset>
-      <fieldset class="fire-time-settings">
-        <legend>Horário do desmonte</legend>
-        <label for="manual-fire-time">Horário local do desmonte (obrigatório sem o Historial da DRB)</label>
-        <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
-        <p id="manual-fire-time-help" class="field-help">Normalmente o horário é lido do <code>[Fire]</code>. Se você não anexar o Historial da DRB, informe aqui o horário local e use “Forçar execução”. Esse valor não sofre nova conversão de fuso.</p>
-        <p id="manual-fire-time-error" class="field-error" role="alert" hidden></p>
-      </fieldset>
-      <fieldset class="timezone-settings">
-        <legend>Conversão de horário</legend>
-        <label for="timezone-offset">Fuso horário gravado no Excel</label>
-        <select id="timezone-offset" name="timezoneOffset" aria-describedby="timezone-help">
-          <option value="-03:00" selected>UTC-03:00 (Brasília)</option>
-          <option value="+00:00">UTC+00:00 (UTC)</option>
-          <option value="none">Não converter (horário original do HISTO)</option>
-        </select>
-        <p id="timezone-help" class="field-help">A opção UTC-03:00 converte a data e a hora do HISTO para o horário de Brasília antes de gerar o Excel.</p>
-      </fieldset>
-      <fieldset class="charge-target">
-        <legend>Distribuição forçada da carga realizada</legend>
-        <label class="charge-target__toggle" for="enable-charge-target">
-          <input id="enable-charge-target" type="checkbox" aria-controls="charge-target-settings">
-          <span>Forçar um total de carga realizada</span>
-        </label>
-        <div id="charge-target-settings" class="charge-target__settings" hidden>
-          <label for="charge-target-input">Total desejado <span>(kg)</span></label>
-          <div class="charge-target__input-wrap">
-            <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-help charge-target-error">
-            <span aria-hidden="true">kg</span>
+
+      <section class="workspace-options" aria-labelledby="options-title">
+        <div class="workspace__heading workspace__heading--options">
+          <div>
+            <span class="step-label">Etapa 2</span>
+            <h2 id="options-title">Identificação e horário</h2>
           </div>
-          <p id="charge-target-help" class="field-help">A menor e a maior carga permanecem iguais; o restante é distribuído somente nos furos intermediários.</p>
-          <p id="charge-target-error" class="field-error" role="alert" hidden></p>
+          <span class="workspace__hint">A identificação é opcional; informe o horário se o HISTO não trouxer um.</span>
         </div>
-      </fieldset>
+
+        <div class="field-grid">
+          <fieldset class="plan-identity-settings">
+            <legend>Identificação</legend>
+            <label for="plan-identity">ID / nome do plano de fogo em trabalho</label>
+            <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou Plano 440726" aria-describedby="plan-identity-help">
+            <p id="plan-identity-help" class="field-help">Opcional. O ID informado será gravado no Excel.</p>
+          </fieldset>
+
+          <fieldset class="fire-time-settings">
+            <legend>Horário</legend>
+            <label for="manual-fire-time">Horário local do desmonte <span class="label-note">(obrigatório sem o Historial da DRB)</span></label>
+            <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
+            <p id="manual-fire-time-help" class="field-help">Usado quando o HISTO não for anexado ou não trouxer um <code>[Fire]</code> legível.</p>
+            <p id="manual-fire-time-error" class="field-error" role="alert" hidden></p>
+          </fieldset>
+        </div>
+
+        <details class="advanced-options">
+          <summary>
+            <span>Opções de saída</span>
+            <span class="summary-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="advanced-options__body">
+            <fieldset class="timezone-settings">
+              <legend>Conversão de horário</legend>
+              <label for="timezone-offset">Fuso horário gravado no Excel</label>
+              <select id="timezone-offset" name="timezoneOffset" aria-describedby="timezone-help">
+                <option value="-03:00" selected>UTC-03:00 (Brasília)</option>
+                <option value="+00:00">UTC+00:00 (UTC)</option>
+                <option value="none">Não converter (horário original do HISTO)</option>
+              </select>
+              <p id="timezone-help" class="field-help">Aplica-se somente ao horário lido do HISTO.</p>
+            </fieldset>
+
+            <fieldset class="charge-target">
+              <legend>Distribuição de carga</legend>
+              <label class="charge-target__toggle" for="enable-charge-target">
+                <input id="enable-charge-target" type="checkbox" aria-controls="charge-target-settings">
+                <span>Forçar um total de carga realizada</span>
+              </label>
+              <div id="charge-target-settings" class="charge-target__settings" hidden>
+                <label for="charge-target-input">Total desejado <span>(kg)</span></label>
+                <div class="charge-target__input-wrap">
+                  <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-help charge-target-error">
+                  <span aria-hidden="true">kg</span>
+                </div>
+                <p id="charge-target-help" class="field-help">Preserva a menor e a maior carga e distribui o restante nos furos intermediários.</p>
+                <p id="charge-target-error" class="field-error" role="alert" hidden></p>
+              </div>
+            </fieldset>
+          </div>
+        </details>
+      </section>
+
       <div class="generation-actions">
-        <button id="submit" type="submit">Validar e gerar Excel <span>→</span></button>
-        <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span>→</span></button>
-        <p id="force-help" class="field-help force-help">Use quando a diferença do ID ou a ausência do histórico for explicada pelo contexto do desmonte. Sem o Historial da DRB, informe o horário acima; a data será a data local do navegador. As outras validações permanecem obrigatórias.</p>
+        <button id="submit" type="submit">Validar e gerar Excel <span aria-hidden="true">→</span></button>
+        <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span aria-hidden="true">→</span></button>
+        <p id="force-help" class="field-help force-help">Use só quando o contexto explicar a divergência. Sem o Historial da DRB, informe o horário acima.</p>
       </div>
-      <div id="progress" class="progress" hidden aria-live="polite"><div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
+
+      <div id="progress" class="progress" hidden aria-live="polite">
+        <div class="progress-head"><span id="progress-label">Preparando...</span><strong id="progress-value">0%</strong></div>
+        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+      </div>
     </form>
 
     <section id="result" class="result" hidden></section>
-    <section id="models" class="models" aria-labelledby="models-title">
-      <div class="models__intro"><span class="eyebrow red">MODELOS</span><h2 id="models-title">Baixe os modelos Excel</h2><p>Use os modelos para preparar as planilhas de apoio antes de anexá-las ao processamento.</p></div>
+
+    <details id="models" class="models">
+      <summary>
+        <span>
+          <strong>Modelos de apoio</strong>
+          <span>Baixe uma planilha-base antes de começar, se necessário.</span>
+        </span>
+        <span class="summary-chevron" aria-hidden="true">⌄</span>
+      </summary>
       <div class="models__downloads">
-        <a class="download model-download" href="./modelos/modelo-pre-corte-sem-furos.xlsx" download="modelo-pre-corte-sem-furos.xlsx" aria-label="Baixar Modelo - Pré-Corte - SEM FUROS"><span>Modelo - Pré-Corte - SEM FUROS</span><span aria-hidden="true">↓</span></a>
-        <a class="download model-download" href="./modelos/modelo-producao.xls" download="modelo-producao.xls" aria-label="Baixar Modelo - Produção"><span>Modelo - Produção</span><span aria-hidden="true">↓</span></a>
+        <a class="download model-download" href="./modelos/modelo-pre-corte-sem-furos.xlsx" download="modelo-pre-corte-sem-furos.xlsx" aria-label="Baixar Modelo - Pré-Corte - SEM FUROS">
+          <span>Modelo - Pré-Corte - SEM FUROS</span><span aria-hidden="true">↓</span>
+        </a>
+        <a class="download model-download" href="./modelos/modelo-producao.xls" download="modelo-producao.xls" aria-label="Baixar Modelo - Produção">
+          <span>Modelo - Produção</span><span aria-hidden="true">↓</span>
+        </a>
       </div>
-    </section>
-    <section class="requirements"><div><span class="number">01</span><strong>Entradas orientadas</strong><p>O tutorial identifica as cinco entradas e o histórico da DRB aceita TXT ou LOG.</p></div><div><span class="number">02</span><strong>Validação automática</strong><p>Colunas, plano, data, carga e estrutura são conferidos antes da exportação.</p></div><div><span class="number">03</span><strong>Excel rastreável</strong><p>O arquivo é identificado pelo plano e acompanha o horário convertido no resumo.</p></div></section>
+    </details>
   </main>
+
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js"></script><script src="./plan-id.js?v=20260911-force-no-histo"></script><script src="./timing.js?v=20260720-carga-alvo"></script><script src="./charge.js?v=20260720-carga-alvo"></script><script src="./timezone.js?v=20260812"></script><script src="./app.js?v=20260911-force-no-histo"></script>
+  <script src="./config.js"></script>
+  <script src="./plan-id.js?v=20260911-force-no-histo"></script>
+  <script src="./timing.js?v=20260720-carga-alvo"></script>
+  <script src="./charge.js?v=20260720-carga-alvo"></script>
+  <script src="./timezone.js?v=20260812"></script>
+  <script src="./app.js?v=20260914-compact-ui"></script>
 </body>
 </html>

@@ -1,18 +1,44 @@
-.plan-identity-settings{margin:4px 0 14px;border:1px solid var(--line);padding:18px;background:#fbfcfc}
-.plan-identity-settings legend{padding:0 7px;color:var(--gray);font-size:12px;font-weight:700;letter-spacing:.04em}
-.plan-identity-settings label{display:block;color:var(--gray);font-size:13px;font-weight:700;margin-bottom:7px}
-.plan-identity-settings input{width:100%;max-width:470px;height:44px;border:1px solid #aeb7bd;padding:0 12px;color:var(--ink);font:inherit;background:var(--white)}
-.plan-identity-settings input:focus{outline:2px solid rgba(226,6,19,.22);outline-offset:1px;border-color:var(--red)}
-.fire-time-settings{margin:4px 0 14px;border:1px solid var(--line);padding:18px;background:#fbfcfc}
-.fire-time-settings legend{padding:0 7px;color:var(--gray);font-size:12px;font-weight:700;letter-spacing:.04em}
-.fire-time-settings label{display:block;color:var(--gray);font-size:13px;font-weight:700;margin-bottom:7px}
-.fire-time-settings input{width:100%;max-width:220px;height:44px;border:1px solid #aeb7bd;padding:0 12px;color:var(--ink);font:inherit;background:var(--white)}
-.fire-time-settings input:focus{outline:2px solid rgba(226,6,19,.22);outline-offset:1px;border-color:var(--red)}
-.fire-time-settings input[aria-invalid="true"]{border-color:var(--red);background:#fff7f7}
-.generation-actions{margin-top:4px}
-.generation-actions button+button{margin-top:10px}
-.force-submit{background:var(--gray)}
-.force-submit:hover{background:#263540}
-.force-submit:disabled{opacity:.45;cursor:not-allowed}
-.force-help{text-align:center;margin:10px auto 0;max-width:760px}
-.force-hint{font-weight:700;color:#7d2026}
+/* Regras específicas do fluxo de execução forçada. */
+.charge-target__toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.charge-target__toggle input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--red);
+}
+
+.charge-target__settings {
+  max-width: 470px;
+  margin-top: 13px;
+}
+
+.charge-target__settings > label { margin-bottom: 6px; }
+
+.charge-target__settings > label span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.charge-target__input-wrap { position: relative; }
+
+.charge-target__input-wrap input { padding-right: 43px; }
+
+.charge-target__input-wrap > span {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.force-hint {
+  color: #7d2026;
+  font-weight: 700;
+}
