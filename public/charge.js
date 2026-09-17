@@ -63,6 +63,13 @@
     if (minimumIndex < 0 || minimumIndex >= charges.length || maximumIndex < 0 || maximumIndex >= charges.length || minimumIndex === maximumIndex) {
       throw new Error('Não foi possível identificar furos extremos distintos para distribuir a carga.');
     }
+    const maximumIndexes = Array.isArray(options.maximumIndexes)
+      ? [...new Set(options.maximumIndexes)]
+      : [maximumIndex];
+    if (!maximumIndexes.length || maximumIndexes.some(index => !Number.isInteger(index) || index < 0 || index >= charges.length)
+      || !maximumIndexes.includes(maximumIndex) || maximumIndexes.includes(minimumIndex)) {
+      throw new Error('Não foi possível identificar furos extremos distintos para distribuir a carga.');
+    }
     const hasExplicitMinimum = Number.isFinite(options.minimumValue);
     const minimum = hasExplicitMinimum ? options.minimumValue : charges[minimumIndex];
     const maximum = Number.isFinite(options.maximumValue) ? options.maximumValue : charges[maximumIndex];
@@ -76,7 +83,7 @@
       throw new Error('A carga mínima informada não pode ser maior que a maior carga preservada da planilha.');
     }
 
-    const adjustable = charges.map((_, index) => index).filter(index => index !== minimumIndex && index !== maximumIndex);
+    const adjustable = charges.map((_, index) => index).filter(index => index !== minimumIndex && !maximumIndexes.includes(index));
     if (!adjustable.length) {
       throw new Error('Não há furos intermediários disponíveis para distribuir a carga-alvo.');
     }
@@ -86,8 +93,8 @@
     const minimumUnits = Math.round(minimum * scale);
     const maximumUnits = Math.round(maximum * scale);
     const targetUnits = Math.round(target * scale);
-    const lowerBound = minimumUnits + maximumUnits + adjustable.length * minimumUnits;
-    const upperBound = minimumUnits + maximumUnits + adjustable.length * maximumUnits;
+    const lowerBound = minimumUnits + maximumIndexes.length * maximumUnits + adjustable.length * minimumUnits;
+    const upperBound = minimumUnits + maximumIndexes.length * maximumUnits + adjustable.length * maximumUnits;
     if (targetUnits < lowerBound || targetUnits > upperBound) {
       const lower = lowerBound / scale;
       const upper = upperBound / scale;
@@ -96,7 +103,7 @@
 
     const initialUnits = charges.map((value, index) => {
       if (index === minimumIndex) return minimumUnits;
-      if (index === maximumIndex) return maximumUnits;
+      if (maximumIndexes.includes(index)) return maximumUnits;
       return Math.max(minimumUnits, Math.min(maximumUnits, Math.round(value * scale)));
     });
     const currentUnits = initialUnits.reduce((sum, value) => sum + value, 0);

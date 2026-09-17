@@ -351,8 +351,9 @@ function redistributeZeros(values) {
   const validIndexes = result.map((value, index) => value !== null && value !== 0 ? index : -1).filter(index => index >= 0);
   if (validIndexes.length < 3) throw new Error('Não há furos suficientes para redistribuir a carga zerada preservando os extremos.');
   const minIndex = validIndexes.reduce((best, index) => result[index] < result[best] ? index : best, validIndexes[0]);
-  const maxIndex = validIndexes.reduce((best, index) => result[index] > result[best] ? index : best, validIndexes[0]);
-  const adjustable = validIndexes.filter(index => index !== minIndex && index !== maxIndex);
+  const maxValue = Math.max(...validIndexes.map(index => result[index]));
+  const maxIndexes = validIndexes.filter(index => result[index] === maxValue);
+  const adjustable = validIndexes.filter(index => index !== minIndex && !maxIndexes.includes(index));
   const zeroAllocation = BUSINESS.zeroChargeMinimum * zeroIndexes.length;
   const adjustableTotal = adjustable.reduce((sum, index) => sum + result[index], 0);
   if (!adjustableTotal || zeroAllocation >= BUSINESS.chargeTarget) throw new Error('Não foi possível redistribuir a carga mantendo os extremos.');
@@ -360,6 +361,7 @@ function redistributeZeros(values) {
   adjustable.forEach(index => { result[index] -= (result[index] / adjustableTotal) * zeroAllocation; });
   const remainder = Math.round((values.reduce((sum, value) => sum + (value ?? 0), 0) - result.reduce((sum, value) => sum + (value ?? 0), 0)) * 1000) / 1000;
   result[adjustable[0]] = Math.round((result[adjustable[0]] + remainder) * 1000) / 1000;
+  if (maxIndexes.some(index => result[index] !== values[index])) throw new Error('A redistribuição alterou indevidamente a maior carga original.');
   return result;
 }
 
@@ -386,39 +388,50 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
   const baseCharges = redistributeZeros(rawCharges);
   const positiveIndexes = rawCharges.map((value, index) => value !== null && value > 0 ? index : -1).filter(index => index >= 0);
   let chargeOptionsWithExtremes = chargeOptions;
+  let chargeMetadata = null;
   if (chargeOptions.enabled) {
     if (positiveIndexes.length < 2) {
       throw new Error('São necessários pelo menos dois furos com carga positiva na planilha para preservar a maior carga.');
     }
     const minimumIndex = findUniqueHoleIndex(merged, chargeOptions.minimumHoleId);
     const maximumIndex = positiveIndexes.reduce((best, index) => rawCharges[index] > rawCharges[best] ? index : best, positiveIndexes[0]);
+    const maximumValue = rawCharges[maximumIndex];
+    const maximumIndexes = positiveIndexes.filter(index => rawCharges[index] === maximumValue);
+    if (maximumIndexes.includes(minimumIndex)) {
+      throw new Error('O ID do furo de menor carga não pode pertencer a um furo de maior carga original.');
+    }
     chargeOptionsWithExtremes = {
       ...chargeOptions,
       minimumIndex,
       minimumValue: chargeOptions.minimum,
       maximumIndex,
-      maximumValue: rawCharges[maximumIndex]
+      maximumValue,
+      maximumIndexes
     };
+    chargeMetadata = { minimumHoleId: numbers[minimumIndex], maximumHoleId: numbers[maximumIndex], maximumValue };
   }
   const charges = chargeOptions.enabled
     ? window.OpenBlastCharge.distributeCharges(baseCharges, chargeOptions.target, chargeOptionsWithExtremes)
     : baseCharges;
   const stemming = applyStemmingVariation(merged.map(row => parseNumber(row.Stemming)), numbers, event.planId);
-  return stemming.then(stemmingValues => merged.map((row, index) => {
-    const diameterRaw = parseNumber(row.Diameter);
-    const diameter = diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw;
-    return {
-      Data: event.date, Horario: event.time, Plano: event.planId, Tipo: BUSINESS.type, id: numbers[index],
-      y: parseNumber(row.Y), x: parseNumber(row.X), 'Z (crest)': parseNumber(row.Z), 'Z (toe)': parseNumber(row.Z_Toe),
-      'profundidade prevista': parseNumber(row.Length_m ?? row.p_length), 'profundidade realizada': parseNumber(row.Length),
-      azimute: parseNumber(row.Azimuth), inclinacao: parseNumber(row.Angle), 'cargas previstas': parseNumber(row.Total_Charge_kg),
-      'cargas realizadas': charges[index], 'tampao previsto': parseNumber(row.Stemming_m), 'tampao realizado': stemmingValues[index],
-      subfuracao: parseNumber(row.Subdrilling) ?? parseNumber(row.Subdrilling_m), diametro: diameter, 'tempo detonacao (ms)': times[index]
-    };
-  }));
+  return stemming.then(stemmingValues => {
+    const data = merged.map((row, index) => {
+      const diameterRaw = parseNumber(row.Diameter);
+      const diameter = diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw;
+      return {
+        Data: event.date, Horario: event.time, Plano: event.planId, Tipo: BUSINESS.type, id: numbers[index],
+        y: parseNumber(row.Y), x: parseNumber(row.X), 'Z (crest)': parseNumber(row.Z), 'Z (toe)': parseNumber(row.Z_Toe),
+        'profundidade prevista': parseNumber(row.Length_m ?? row.p_length), 'profundidade realizada': parseNumber(row.Length),
+        azimute: parseNumber(row.Azimuth), inclinacao: parseNumber(row.Angle), 'cargas previstas': parseNumber(row.Total_Charge_kg),
+        'cargas realizadas': charges[index], 'tampao previsto': parseNumber(row.Stemming_m), 'tampao realizado': stemmingValues[index],
+        subfuracao: parseNumber(row.Subdrilling) ?? parseNumber(row.Subdrilling_m), diametro: diameter, 'tempo detonacao (ms)': times[index]
+      };
+    });
+    return { data, chargeMetadata };
+  });
 }
 
-function summarizeChargeDistribution(data, chargeOptions = {}) {
+function summarizeChargeDistribution(data, chargeOptions = {}, chargeMetadata = {}) {
   const values = data.map(row => row['cargas realizadas']);
   if (!values.length || values.some(value => !Number.isFinite(value))) {
     throw new Error('Não foi possível resumir as cargas realizadas após a distribuição.');
@@ -432,8 +445,8 @@ function summarizeChargeDistribution(data, chargeOptions = {}) {
     total: values.reduce((sum, value) => sum + value, 0),
     minimum: values[minimumIndex],
     minimumHoleId: data[minimumIndex].id,
-    maximum: values[maximumIndex],
-    maximumHoleId: data[maximumIndex].id
+    maximum: chargeMetadata.maximumValue ?? values[maximumIndex],
+    maximumHoleId: chargeMetadata.maximumHoleId ?? data[maximumIndex].id
   };
 }
 
@@ -502,12 +515,13 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
     planIdentity: planIdentity.raw || ''
   }, eventTimezoneOffset);
   setProgress(62, 'Montando os dados dos furos...');
-  const data = await buildRows(projectRows, finalRows, event, chargeOptions);
+  const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions);
+  const data = builtRows.data;
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
   const timing = data.map(row => row['tempo detonacao (ms)']);
   if (timing.some(value => !Number.isInteger(value) || value < 0)) throw new Error('Há furos sem uma temporização inteira e não negativa após a simulação.');
   if (new Set(timing).size !== timing.length) throw new Error('Há furos com temporização repetida após a simulação.');
-  const chargeSummary = chargeOptions.enabled ? summarizeChargeDistribution(data, chargeOptions) : null;
+  const chargeSummary = chargeOptions.enabled ? summarizeChargeDistribution(data, chargeOptions, builtRows.chargeMetadata) : null;
   return {
     workbook: buildWorkbook(data, sources, event, chargeOptions, chargeSummary), event, rows: data.length,
     totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0),

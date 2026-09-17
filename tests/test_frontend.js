@@ -66,6 +66,9 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /data local do navegador/);
   assert.match(app, /runGeneration\(true\)/);
   assert.match(app, /Anexe os arquivos do plano para continuar/);
+  assert.match(app, /maximumIndexes/);
+  assert.match(app, /chargeMetadata/);
+  assert.match(app, /não pode pertencer a um furo de maior carga original/);
 }
 
 for (const file of ['index.html', 'app.js', 'plan-id.js', 'force-execution.css', 'styles.css', 'charge.js']) {

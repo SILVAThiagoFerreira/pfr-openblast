@@ -51,6 +51,24 @@ const manualMinimumAtLowerBound = distributeCharges([5, 10, 15, 60], 120, {
 });
 assert.deepEqual(manualMinimumAtLowerBound, [20, 20, 20, 60]);
 
+const tiedMaximums = distributeCharges([5, 60, 10, 60], 180, {
+  minimumIndex: 0,
+  minimumValue: 20,
+  maximumIndex: 1,
+  maximumIndexes: [1, 3],
+  maximumValue: 60
+});
+assert.equal(total(tiedMaximums), 180);
+assert.deepEqual(tiedMaximums, [20, 60, 40, 60]);
+
+assert.throws(() => distributeCharges([5, 60, 10, 60], 180, {
+  minimumIndex: 1,
+  minimumValue: 20,
+  maximumIndex: 1,
+  maximumIndexes: [1, 3],
+  maximumValue: 60
+}), /furos extremos distintos/);
+
 assert.throws(() => distributeCharges([5, 10, 60], 120, {
   minimumIndex: 1,
   minimumValue: 61,
