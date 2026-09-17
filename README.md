@@ -7,7 +7,7 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 2. Valida estrutura e colunas.
 3. Cria backup dos insumos.
 4. Resolve ID do plano e data/hora do disparo.
-5. Consolida os dados e aplica as regras de negócio, incluindo preenchimento determinístico de `tempo detonacao (ms)` vazio, negativo, inválido ou repetido pela posição do furo na sequência `Number`, garantindo tempos inteiros e únicos; também faz o fechamento opcional da carga total aplicada ao alvo configurado preservando os extremos da coluna e, em modo de teste, aplica variação controlada de `tampao realizado` com exportação de `tampao previsto` / `tampao realizado` em uma casa decimal.
+5. Consolida os dados e aplica as regras de negócio, incluindo preenchimento determinístico de `tempo detonacao (ms)` vazio, negativo, inválido ou repetido pela posição do furo na sequência `Number`, garantindo tempos inteiros e únicos; também faz o fechamento opcional da carga total aplicada ao alvo configurado preservando os extremos da coluna e, no site, permite fixar a carga mínima e o ID do furo que a receberá, mantendo a maior carga original da planilha; em modo de teste, aplica variação controlada de `tampao realizado` com exportação de `tampao previsto` / `tampao realizado` em uma casa decimal.
 6. Exporta o Excel final com rastreabilidade.
 
 ## Entradas
@@ -56,6 +56,7 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`; se a geração for acionada sem anexos, informa o próximo passo no próprio resultado, sem iniciar processamento vazio.
 - O campo opcional `ID / nome do plano de fogo em trabalho` permite informar a identificação desejada para o Excel. O campo `Horário local do desmonte` permite corrigir uma ausência ou ambiguidade de horário. Quando a divergência for somente entre meses do ID ou o HISTO não for anexado, o botão `Forçar execução` pede confirmação, mantém as validações operacionais e registra o ID informado, a fonte do horário, a fonte da data e a ausência do histórico no resumo/log.
+- Ao habilitar o total de carga realizada, o usuário também informa a carga mínima por furo e o `ID do furo de menor carga`. Esse furo recebe exatamente o mínimo informado; os demais furos intermediários são ajustados de forma determinística em todo o plano, sem ultrapassar o mínimo ou a maior carga. A maior carga e o respectivo furo são lidos do `InputedCharge` da planilha e preservados sem edição.
 
 ### Organização da interface online
 
@@ -72,7 +73,7 @@ Exemplo validado:
 ## Regra de carga total
 Quando `business.enforce_charge_total_target` estiver habilitado, o total de `cargas realizadas` e fechado em `business.charge_total_target_kg` sem alterar o furo de menor carga nem o de maior carga.
 
-No site, o campo opcional **Forçar total de carga realizada** permite informar esse alvo diretamente em kg para a execução atual. O valor é distribuído entre os furos intermediários, mantendo o menor e o maior valor originais e fechando o total com precisão. Sem habilitar o campo, o site preserva a distribuição padrão; se o alvo for inviável, a validação é interrompida com o motivo.
+No site, o bloco opcional **Forçar um total de carga realizada** permite informar o alvo diretamente em kg para a execução atual, além da carga mínima por furo e do ID que deverá receber essa menor carga. A diferença é distribuída de forma determinística por todos os furos intermediários, mantendo o furo identificado exatamente no mínimo informado, preservando exatamente a maior carga original da planilha e fechando o total com precisão. O resumo do Excel registra total, mínimo, ID do mínimo, máximo e ID do máximo. Sem habilitar o bloco, o site preserva a distribuição padrão; se a combinação for inviável, a validação é interrompida com o motivo.
 
 No novo HISTO, os marcadores `BP:440826` e `BP: PP440826` são reconhecidos. Se o usuário informar, por exemplo, `PP440726` no campo de identificação e o HISTO registrar `440826`, a execução forçada grava `440726` como plano do Excel e mantém `440826` como referência do HISTO, sem alterar as validações restantes.
 

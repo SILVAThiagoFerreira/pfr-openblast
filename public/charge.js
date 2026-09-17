@@ -63,21 +63,29 @@
     if (minimumIndex < 0 || minimumIndex >= charges.length || maximumIndex < 0 || maximumIndex >= charges.length || minimumIndex === maximumIndex) {
       throw new Error('Não foi possível identificar furos extremos distintos para distribuir a carga.');
     }
-    const minimum = charges[minimumIndex];
-    const maximum = charges[maximumIndex];
-    const currentTotal = charges.reduce((sum, value) => sum + value, 0);
+    const hasExplicitMinimum = Number.isFinite(options.minimumValue);
+    const minimum = hasExplicitMinimum ? options.minimumValue : charges[minimumIndex];
+    const maximum = Number.isFinite(options.maximumValue) ? options.maximumValue : charges[maximumIndex];
+    if (!Number.isFinite(minimum) || minimum < 0 || (hasExplicitMinimum && minimum === 0)) {
+      throw new Error('A carga mínima por furo deve ser um número maior que zero.');
+    }
+    if (!Number.isFinite(maximum) || maximum < 0) {
+      throw new Error('A maior carga preservada deve ser um número maior ou igual a zero.');
+    }
+    if (minimum > maximum) {
+      throw new Error('A carga mínima informada não pode ser maior que a maior carga preservada da planilha.');
+    }
 
     const adjustable = charges.map((_, index) => index).filter(index => index !== minimumIndex && index !== maximumIndex);
     if (!adjustable.length) {
       throw new Error('Não há furos intermediários disponíveis para distribuir a carga-alvo.');
     }
 
-    const precision = Math.max(2, decimalPlaces(target), ...charges.map(decimalPlaces));
+    const precision = Math.max(2, decimalPlaces(target), decimalPlaces(minimum), decimalPlaces(maximum), ...charges.map(decimalPlaces));
     const scale = 10 ** Math.min(6, precision);
     const minimumUnits = Math.round(minimum * scale);
     const maximumUnits = Math.round(maximum * scale);
     const targetUnits = Math.round(target * scale);
-    const currentUnits = charges.reduce((sum, value) => sum + Math.round(value * scale), 0);
     const lowerBound = minimumUnits + maximumUnits + adjustable.length * minimumUnits;
     const upperBound = minimumUnits + maximumUnits + adjustable.length * maximumUnits;
     if (targetUnits < lowerBound || targetUnits > upperBound) {
@@ -86,9 +94,14 @@
       throw new Error(`O alvo é impossível mantendo a menor e a maior carga. Para estes furos, use um total entre ${lower.toFixed(2)} kg e ${upper.toFixed(2)} kg.`);
     }
 
-    if (targetUnits === currentUnits) return charges.slice();
+    const initialUnits = charges.map((value, index) => {
+      if (index === minimumIndex) return minimumUnits;
+      if (index === maximumIndex) return maximumUnits;
+      return Math.max(minimumUnits, Math.min(maximumUnits, Math.round(value * scale)));
+    });
+    const currentUnits = initialUnits.reduce((sum, value) => sum + value, 0);
+    if (targetUnits === currentUnits) return initialUnits.map(value => value / scale);
 
-    const initialUnits = charges.map(value => Math.round(value * scale));
     const adjustedUnits = rebalanceUnits(
       initialUnits,
       adjustable,

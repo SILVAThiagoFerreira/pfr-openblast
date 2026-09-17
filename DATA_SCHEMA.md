@@ -50,7 +50,7 @@ Campos principais:
 - O ajuste só pode atuar nos furos intermediários.
 - O menor e o maior valor de carga devem permanecer inalterados.
 - Nenhum valor ajustado pode ficar abaixo do menor valor preservado nem acima do maior valor preservado.
-- No site, o campo opcional de total de carga realizada fornece o alvo da execução atual e tem precedência sobre a configuração. O alvo deve ser positivo; quando habilitado, a soma final deve fechar no valor informado, com distribuição determinística nos furos intermediários e erro explícito para alvos inviáveis. Sem o campo habilitado, a regra pública permanece desativada.
+- No site, o bloco opcional de carga realizada fornece o alvo da execução atual e tem precedência sobre a configuração. Quando habilitado, `chargeTarget` deve ser positivo, `chargeMinimum` deve ser positivo e `chargeMinimumHoleId` deve identificar exatamente um `Number` presente na saída. Esse furo recebe exatamente `chargeMinimum`; a maior carga e seu furo são obtidos do `InputedCharge` original e preservados exatamente. Os demais furos intermediários são ajustados de forma determinística em todo o plano, sempre no intervalo `[chargeMinimum, maior carga original]`, e a soma final fecha no alvo. O Excel registra `Carga-alvo aplicado (kg)`, `Carga mínima aplicada (kg)`, `ID do furo de menor carga`, `Carga máxima preservada (kg)` e `ID do furo de maior carga`. Sem o bloco habilitado, a regra pública permanece desativada.
 
 ## Historico de disparo
 Arquivo: `HISTO-*.txt` ou `*_histo.log`; obrigatório no modo automático e opcional no modo forçado

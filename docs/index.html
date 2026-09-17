@@ -7,7 +7,7 @@
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
   <link rel="stylesheet" href="./styles.css?v=20260914-compact-ui">
-  <link rel="stylesheet" href="./force-execution.css?v=20260914-compact-ui">
+  <link rel="stylesheet" href="./force-execution.css?v=20260917-charge-minimum">
 </head>
 <body>
   <header class="openblast-hubbar" aria-label="Identidade OpenBlast">
@@ -134,13 +134,31 @@
                 <span>Forçar um total de carga realizada</span>
               </label>
               <div id="charge-target-settings" class="charge-target__settings" hidden>
-                <label for="charge-target-input">Total desejado <span>(kg)</span></label>
-                <div class="charge-target__input-wrap">
-                  <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-help charge-target-error">
-                  <span aria-hidden="true">kg</span>
+                <div class="charge-target__grid">
+                  <div class="charge-target__field">
+                    <label for="charge-target-input">Total desejado <span>(kg)</span></label>
+                    <div class="charge-target__input-wrap">
+                      <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-help charge-target-error">
+                      <span aria-hidden="true">kg</span>
+                    </div>
+                    <p id="charge-target-error" class="field-error" role="alert" hidden></p>
+                  </div>
+                  <div class="charge-target__field">
+                    <label for="charge-minimum-input">Carga mínima por furo <span>(kg)</span></label>
+                    <div class="charge-target__input-wrap">
+                      <input id="charge-minimum-input" name="chargeMinimum" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 0,50" aria-describedby="charge-target-help charge-minimum-error">
+                      <span aria-hidden="true">kg</span>
+                    </div>
+                    <p id="charge-minimum-error" class="field-error" role="alert" hidden></p>
+                  </div>
+                  <div class="charge-target__field charge-target__field--hole">
+                    <label for="charge-minimum-hole-id">ID do furo de menor carga</label>
+                    <input id="charge-minimum-hole-id" name="chargeMinimumHoleId" type="text" inputmode="numeric" autocomplete="off" placeholder="Ex.: 245" aria-describedby="charge-target-help charge-minimum-hole-error">
+                    <p id="charge-minimum-hole-error" class="field-error" role="alert" hidden></p>
+                  </div>
                 </div>
-                <p id="charge-target-help" class="field-help">Preserva a menor e a maior carga e distribui o restante nos furos intermediários.</p>
-                <p id="charge-target-error" class="field-error" role="alert" hidden></p>
+                <p id="charge-target-help" class="field-help">O ID informado receberá exatamente o mínimo. Os demais furos serão ajustados em todo o plano, dentro desse mínimo e da maior carga existente.</p>
+                <p class="charge-target__preserved"><strong>Máximo preservado:</strong> a maior carga já registrada na planilha será mantida exatamente; não é necessário informá-la.</p>
               </div>
             </fieldset>
           </div>
@@ -185,8 +203,8 @@
   <script src="./config.js"></script>
   <script src="./plan-id.js?v=20260911-force-no-histo"></script>
   <script src="./timing.js?v=20260720-carga-alvo"></script>
-  <script src="./charge.js?v=20260720-carga-alvo"></script>
+  <script src="./charge.js?v=20260917-charge-minimum"></script>
   <script src="./timezone.js?v=20260812"></script>
-  <script src="./app.js?v=20260914-compact-ui"></script>
+  <script src="./app.js?v=20260917-charge-minimum"></script>
 </body>
 </html>

@@ -14,6 +14,10 @@ const chargeTargetToggle = document.querySelector('#enable-charge-target');
 const chargeTargetSettings = document.querySelector('#charge-target-settings');
 const chargeTargetInput = document.querySelector('#charge-target-input');
 const chargeTargetError = document.querySelector('#charge-target-error');
+const chargeMinimumInput = document.querySelector('#charge-minimum-input');
+const chargeMinimumError = document.querySelector('#charge-minimum-error');
+const chargeMinimumHoleInput = document.querySelector('#charge-minimum-hole-id');
+const chargeMinimumHoleError = document.querySelector('#charge-minimum-hole-error');
 const timezoneOffset = document.querySelector('#timezone-offset');
 const planIdentityInput = document.querySelector('#plan-identity');
 const manualFireTimeInput = document.querySelector('#manual-fire-time');
@@ -138,28 +142,67 @@ function parseNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function formatKg(value) {
+  return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+}
+
 function setChargeTargetError(message = '') {
   chargeTargetError.textContent = message;
   chargeTargetError.hidden = !message;
   chargeTargetInput.setAttribute('aria-invalid', message ? 'true' : 'false');
 }
 
+function setChargeMinimumError(message = '') {
+  chargeMinimumError.textContent = message;
+  chargeMinimumError.hidden = !message;
+  chargeMinimumInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function setChargeMinimumHoleError(message = '') {
+  chargeMinimumHoleError.textContent = message;
+  chargeMinimumHoleError.hidden = !message;
+  chargeMinimumHoleInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
 function syncChargeTargetControls() {
   const enabled = chargeTargetToggle.checked;
   chargeTargetSettings.hidden = !enabled;
   chargeTargetSettings.setAttribute('aria-hidden', String(!enabled));
-  if (!enabled) setChargeTargetError();
+  if (!enabled) {
+    setChargeTargetError();
+    setChargeMinimumError();
+    setChargeMinimumHoleError();
+  }
 }
 
 function readChargeTarget() {
-  if (!chargeTargetToggle.checked) return { enabled: false, target: null };
+  if (!chargeTargetToggle.checked) return { enabled: false, target: null, minimum: null, minimumHoleId: '' };
   const target = parseNumber(chargeTargetInput.value);
+  const minimum = parseNumber(chargeMinimumInput.value);
+  const minimumHoleId = chargeMinimumHoleInput.value.trim();
+  let firstError = '';
   if (target === null || target <= 0) {
     setChargeTargetError('Informe um total de carga realizada maior que zero.');
-    throw new Error('Informe um total de carga realizada maior que zero.');
+    firstError ||= 'Informe um total de carga realizada maior que zero.';
+  } else {
+    setChargeTargetError();
   }
-  setChargeTargetError();
-  return { enabled: true, target };
+  if (minimum === null || minimum <= 0) {
+    setChargeMinimumError('Informe uma carga mínima por furo maior que zero.');
+    firstError ||= 'Informe uma carga mínima por furo maior que zero.';
+  } else {
+    setChargeMinimumError();
+  }
+  if (!minimumHoleId) {
+    setChargeMinimumHoleError('Informe o ID do furo que receberá a menor carga.');
+    firstError ||= 'Informe o ID do furo que receberá a menor carga.';
+  } else {
+    setChargeMinimumHoleError();
+  }
+  if (firstError) {
+    throw new Error(firstError);
+  }
+  return { enabled: true, target, minimum, minimumHoleId };
 }
 
 function readTimezoneOffset() {
@@ -198,6 +241,8 @@ function readManualFireTime() {
 
 chargeTargetToggle.addEventListener('change', syncChargeTargetControls);
 chargeTargetInput.addEventListener('input', () => setChargeTargetError());
+chargeMinimumInput.addEventListener('input', () => setChargeMinimumError());
+chargeMinimumHoleInput.addEventListener('input', () => setChargeMinimumHoleError());
 syncChargeTargetControls();
 
 function key(value) {
@@ -318,6 +363,18 @@ function redistributeZeros(values) {
   return result;
 }
 
+function findUniqueHoleIndex(rows, holeId) {
+  const normalizedId = key(holeId);
+  const indexes = rows.map((row, index) => key(row.Number) === normalizedId ? index : -1).filter(index => index >= 0);
+  if (!indexes.length) {
+    throw new Error(`O ID do furo de menor carga "${holeId}" não foi encontrado no plano realizado.`);
+  }
+  if (indexes.length > 1) {
+    throw new Error(`O ID do furo de menor carga "${holeId}" aparece mais de uma vez no plano realizado.`);
+  }
+  return indexes[0];
+}
+
 function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
   const projects = new Map(projectRows.map(row => [key(row.Number), row]));
   const merged = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }))
@@ -328,13 +385,21 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
   const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
   const baseCharges = redistributeZeros(rawCharges);
   const positiveIndexes = rawCharges.map((value, index) => value !== null && value > 0 ? index : -1).filter(index => index >= 0);
-  const chargeOptionsWithExtremes = chargeOptions.enabled && positiveIndexes.length >= 2
-    ? {
-      ...chargeOptions,
-      minimumIndex: positiveIndexes.reduce((best, index) => rawCharges[index] < rawCharges[best] ? index : best, positiveIndexes[0]),
-      maximumIndex: positiveIndexes.reduce((best, index) => rawCharges[index] > rawCharges[best] ? index : best, positiveIndexes[0])
+  let chargeOptionsWithExtremes = chargeOptions;
+  if (chargeOptions.enabled) {
+    if (positiveIndexes.length < 2) {
+      throw new Error('São necessários pelo menos dois furos com carga positiva na planilha para preservar a maior carga.');
     }
-    : chargeOptions;
+    const minimumIndex = findUniqueHoleIndex(merged, chargeOptions.minimumHoleId);
+    const maximumIndex = positiveIndexes.reduce((best, index) => rawCharges[index] > rawCharges[best] ? index : best, positiveIndexes[0]);
+    chargeOptionsWithExtremes = {
+      ...chargeOptions,
+      minimumIndex,
+      minimumValue: chargeOptions.minimum,
+      maximumIndex,
+      maximumValue: rawCharges[maximumIndex]
+    };
+  }
   const charges = chargeOptions.enabled
     ? window.OpenBlastCharge.distributeCharges(baseCharges, chargeOptions.target, chargeOptionsWithExtremes)
     : baseCharges;
@@ -353,7 +418,26 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
   }));
 }
 
-function buildWorkbook(data, sources, event, chargeOptions = {}) {
+function summarizeChargeDistribution(data, chargeOptions = {}) {
+  const values = data.map(row => row['cargas realizadas']);
+  if (!values.length || values.some(value => !Number.isFinite(value))) {
+    throw new Error('Não foi possível resumir as cargas realizadas após a distribuição.');
+  }
+  const minimumIndex = chargeOptions.enabled
+    ? data.findIndex(row => key(row.id) === key(chargeOptions.minimumHoleId))
+    : values.reduce((best, value, index) => value < values[best] ? index : best, 0);
+  const maximumIndex = values.reduce((best, value, index) => value > values[best] ? index : best, 0);
+  if (minimumIndex < 0) throw new Error('O ID do furo de menor carga não foi encontrado na saída.');
+  return {
+    total: values.reduce((sum, value) => sum + value, 0),
+    minimum: values[minimumIndex],
+    minimumHoleId: data[minimumIndex].id,
+    maximum: values[maximumIndex],
+    maximumHoleId: data[maximumIndex].id
+  };
+}
+
+function buildWorkbook(data, sources, event, chargeOptions = {}, chargeSummary = null) {
   const sheet = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLUMNS });
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
   const summaryRows = [
@@ -366,7 +450,13 @@ function buildWorkbook(data, sources, event, chargeOptions = {}) {
   ];
   if (event.planIdentity) summaryRows.push(['Identificação informada', event.planIdentity]);
   if (event.histoPlanId) summaryRows.push(['ID identificado no HISTO', event.histoPlanId]);
-  if (chargeOptions.enabled) summaryRows.push(['Carga-alvo aplicado (kg)', chargeOptions.target]);
+  if (chargeOptions.enabled) {
+    summaryRows.push(['Carga-alvo aplicado (kg)', chargeOptions.target]);
+    summaryRows.push(['Carga mínima aplicada (kg)', chargeSummary?.minimum]);
+    summaryRows.push(['ID do furo de menor carga', chargeSummary?.minimumHoleId ?? chargeOptions.minimumHoleId]);
+    summaryRows.push(['Carga máxima preservada (kg)', chargeSummary?.maximum]);
+    summaryRows.push(['ID do furo de maior carga', chargeSummary?.maximumHoleId]);
+  }
   const summary = XLSX.utils.aoa_to_sheet(summaryRows);
   summary['!cols'] = [{ wch: 28 }, { wch: 42 }];
   const workbook = XLSX.utils.book_new();
@@ -417,10 +507,13 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   const timing = data.map(row => row['tempo detonacao (ms)']);
   if (timing.some(value => !Number.isInteger(value) || value < 0)) throw new Error('Há furos sem uma temporização inteira e não negativa após a simulação.');
   if (new Set(timing).size !== timing.length) throw new Error('Há furos com temporização repetida após a simulação.');
+  const chargeSummary = chargeOptions.enabled ? summarizeChargeDistribution(data, chargeOptions) : null;
   return {
-    workbook: buildWorkbook(data, sources, event, chargeOptions), event, rows: data.length,
+    workbook: buildWorkbook(data, sources, event, chargeOptions, chargeSummary), event, rows: data.length,
     totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0),
-    chargeTargetApplied: Boolean(chargeOptions.enabled), chargeTarget: chargeOptions.target
+    chargeTargetApplied: Boolean(chargeOptions.enabled), chargeTarget: chargeOptions.target,
+    chargeMinimum: chargeSummary?.minimum, chargeMinimumHoleId: chargeSummary?.minimumHoleId,
+    chargeMaximum: chargeSummary?.maximum, chargeMaximumHoleId: chargeSummary?.maximumHoleId
   };
 }
 
@@ -473,11 +566,11 @@ async function runGeneration(force = false) {
     }
     if (generated.chargeTargetApplied) {
       const targetNote = document.createElement('p');
-      targetNote.textContent = `Distribuição forçada concluída: ${generated.chargeTarget.toFixed(2)} kg foram distribuídos nos furos intermediários, preservando os extremos.`;
+      targetNote.textContent = `Distribuição concluída em todo o plano: total de ${formatKg(generated.chargeTarget)} kg, mínimo de ${formatKg(generated.chargeMinimum)} kg no furo ${generated.chargeMinimumHoleId} e máximo de ${formatKg(generated.chargeMaximum)} kg preservado no furo ${generated.chargeMaximumHoleId}.`;
       result.append(targetNote);
     }
     const metrics = document.createElement('div'); metrics.className = 'metrics';
-    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${generated.totalCharge.toFixed(2)} kg`]];
+    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${formatKg(generated.totalCharge)} kg`]];
     metricsData.push(['Fuso horário', generated.event.timezoneOffset || (generated.event.timeSource ? 'Horário local informado' : 'Original')]);
     metricsData.push(['Fonte da data', generated.event.dateSource === 'browser' ? 'Data local do navegador' : 'HISTO']);
     metricsData.push(['Historial da DRB', generated.event.historySource === 'missing' ? 'Não anexado (forçada)' : 'Anexado']);
@@ -485,7 +578,13 @@ async function runGeneration(force = false) {
     metricsData.push(['Execução', generated.event.forced ? 'Forçada' : 'Automática']);
     if (generated.event.planIdentity) metricsData.push(['ID / nome informado', generated.event.planIdentity]);
     if (generated.event.histoPlanId) metricsData.push(['ID no HISTO', generated.event.histoPlanId]);
-    if (generated.chargeTargetApplied) metricsData.push(['Alvo aplicado', `${generated.chargeTarget.toFixed(2)} kg`]);
+    if (generated.chargeTargetApplied) {
+      metricsData.push(['Alvo aplicado', `${formatKg(generated.chargeTarget)} kg`]);
+      metricsData.push(['Mínimo aplicado', `${formatKg(generated.chargeMinimum)} kg`]);
+      metricsData.push(['ID do menor', generated.chargeMinimumHoleId]);
+      metricsData.push(['Máximo preservado', `${formatKg(generated.chargeMaximum)} kg`]);
+      metricsData.push(['ID do maior', generated.chargeMaximumHoleId]);
+    }
     metricsData.forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'metric'; metric.innerHTML = `<small>${label}</small><strong>${value}</strong>`; metrics.append(metric); });
     result.append(metrics, link); statusText.textContent = 'Online'; setProgress(100, 'Concluído. O Excel está pronto para baixar.');
   } catch (error) {

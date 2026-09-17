@@ -15,7 +15,7 @@ Regras operacionais atuais:
 - Quando houver furos com `InputedCharge` zerado, a carga deve ser redistribuída com total alvo configurado, preservando o menor e o maior valor da coluna.
 - Quando `business.enforce_charge_total_target` estiver habilitado, a carga total aplicada deve fechar no alvo configurado mesmo sem furos zerados, preservando o menor e o maior valor da coluna.
 - A publicação no GitHub Pages deve operar sem inteligência artificial, chave de API ou serviço pago; o modo público processa os anexos localmente no navegador.
-- O site deve oferecer um campo opcional para informar o total de carga realizada em kg e, quando habilitado, distribuir a diferença entre os furos intermediários até fechar exatamente o total informado, preservando os extremos e validando alvos inviáveis.
+- O site deve oferecer um bloco opcional para informar o total de carga realizada em kg, a carga mínima por furo e o ID do furo que receberá o mínimo; quando habilitado, deve distribuir a diferença em todo o plano, fixar esse mínimo no ID informado, preservar exatamente a maior carga original da planilha e fechar o total informado, validando combinações inviáveis.
 - A interface pública deve identificar as tabelas pelas colunas, validar a assinatura do PDF, rejeitar anexos duplicados/excessivos e gerar log local quando a validação falhar.
 - A interface pública deve orientar os cinco arquivos: Config Final.csv, Projeto Completo.csv, Historial da DRB, Plano de Perfuração.xlsx e Plano de Perfuração.pdf; no modo forçado, o Historial da DRB pode ser omitido.
 - O histórico da DRB deve aceitar o padrão `*_histo.log`, com blocos `[StartProcedure]`, linhas `BP:` e eventos `[Fire]`.
@@ -36,3 +36,4 @@ Critério objetivo de conclusão:
 - Disponibilizar o campo `ID / nome do plano de fogo em trabalho` para identificação manual e o botão confirmado `Forçar execução` para divergências explicáveis pelo mês de emissão/desmonte ou ausência do HISTO, preservando as demais validações.
 - Quando o HISTO não for anexado, exigir o horário local informado no site e usar a data local do navegador; registrar no Excel e no log a identificação manual, o modo forçado, a fonte do horário, a fonte da data e a ausência do HISTO.
 - Registrar no Excel e no log o ID efetivamente encontrado no HISTO quando houver diferença.
+- Quando o bloco de carga-alvo estiver habilitado, registrar no Excel o total aplicado, a carga mínima, o ID do furo de menor carga, a maior carga preservada e o ID do furo de maior carga.

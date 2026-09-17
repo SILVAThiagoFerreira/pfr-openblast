@@ -42,6 +42,12 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /id="manual-fire-time-error"/);
   assert.match(html, /obrigatório sem o Historial da DRB/);
   assert.match(html, /id="force-submit"[^>]*>Forçar execução/);
+  assert.match(html, /id="charge-target-input"/);
+  assert.match(html, /id="charge-minimum-input"/);
+  assert.match(html, /for="charge-minimum-input"[^>]*>Carga mínima por furo/);
+  assert.match(html, /id="charge-minimum-hole-id"/);
+  assert.match(html, /for="charge-minimum-hole-id"[^>]*>ID do furo de menor carga/);
+  assert.match(html, /Máximo preservado/);
   assert.match(html, /force-execution\.css/);
   assert.match(html, /\.\/modelos\/modelo-pre-corte-sem-furos\.xlsx/);
   assert.match(html, /\.\/modelos\/modelo-producao\.xls/);
@@ -62,7 +68,7 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /Anexe os arquivos do plano para continuar/);
 }
 
-for (const file of ['index.html', 'app.js', 'plan-id.js', 'force-execution.css', 'styles.css']) {
+for (const file of ['index.html', 'app.js', 'plan-id.js', 'force-execution.css', 'styles.css', 'charge.js']) {
   assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 

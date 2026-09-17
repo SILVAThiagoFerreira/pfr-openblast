@@ -32,6 +32,38 @@ assert.equal(zeroAdjusted[0], 5);
 assert.equal(zeroAdjusted[4], 60);
 assert.ok(zeroAdjusted[1] >= 0.5 && zeroAdjusted[3] >= 0.5);
 
+const manualMinimum = distributeCharges([5, 10, 15, 60], 140, {
+  minimumIndex: 1,
+  minimumValue: 20,
+  maximumIndex: 3,
+  maximumValue: 60
+});
+assert.equal(total(manualMinimum), 140);
+assert.equal(manualMinimum[1], 20);
+assert.equal(manualMinimum[3], 60);
+assert.ok(manualMinimum.slice(0, 3).every(value => value >= 20 && value <= 60));
+
+const manualMinimumAtLowerBound = distributeCharges([5, 10, 15, 60], 120, {
+  minimumIndex: 1,
+  minimumValue: 20,
+  maximumIndex: 3,
+  maximumValue: 60
+});
+assert.deepEqual(manualMinimumAtLowerBound, [20, 20, 20, 60]);
+
+assert.throws(() => distributeCharges([5, 10, 60], 120, {
+  minimumIndex: 1,
+  minimumValue: 61,
+  maximumIndex: 2,
+  maximumValue: 60
+}), /não pode ser maior que a maior carga/);
+assert.throws(() => distributeCharges([5, 10, 60], 70, {
+  minimumIndex: 1,
+  minimumValue: 10,
+  maximumIndex: 2,
+  maximumValue: 59
+}), /alvo é impossível/);
+
 assert.throws(() => distributeCharges([5, 10, 60], 200), /alvo é impossível/);
 assert.throws(() => distributeCharges([5, 10, 60], 50), /alvo é impossível/);
 assert.throws(() => distributeCharges([5, 60], 70), /pelo menos três furos/);
