@@ -19,13 +19,14 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - No novo histórico, o sistema também deve localizar o bloco `[StartProcedure]` que contenha a linha `BP: PP<plano>` e usar o primeiro `[Fire]` posterior dentro desse bloco. Cabeçalhos com espaços, `BP:` e múltiplos eventos `[Fire]` são aceitos.
 - A conversão de fuso é explícita. O offset selecionado (por exemplo, `-03:00`) deve ser aplicado ao instante do HISTO antes da gravação no Excel e identificado no resumo.
 - IDs numéricos presentes em linhas de teste, detonadores ou eventos como `TestDetsResult` não são IDs de plano e não podem nomear a saída.
-- Registros com `eliminated == 1` não entram na saída.
-- O campo `eliminated` é tratado como opcional no arquivo final; quando ausente, a validação não bloqueia a execução.
+- O `Config Final.csv` é a fonte autoritativa dos furos realizados: todo `Number` presente nele entra na saída, mesmo que o mesmo ID esteja com `eliminated == 1` no `Projeto Completo.csv`. A configuração `business.include_eliminated` fica `true` por padrão; somente uma configuração explícita como `false` pode excluir esses registros, e a quantidade excluída deve permanecer auditável.
+- O campo `eliminated` é tratado como opcional no arquivo de projeto; quando ausente, a validação não bloqueia a execução.
 - `DetonatingTime` vazio, não numérico, negativo (incluindo `-1`) ou repetido é tratado como ausência. O sistema analisa a posição do furo na sequência ordenada por `Number`, usa os tempos válidos anterior e posterior como âncoras e gera uma sequência determinística de milissegundos inteiros, sempre sem repetir nenhum tempo na saída. Quando não houver espaço inteiro entre as âncoras, a sequência é estendida de forma determinística para preservar a unicidade.
 - Quando a simulação de teste de tampão estiver habilitada, `tampao realizado` recebe uma variação determinística de até `0,12` para mais ou para menos e `tampao previsto` / `tampao realizado` são exportados com uma casa decimal.
 - Quando houver `cargas realizadas` zeradas, o fluxo deve redistribuir uma carga mínima configurada sem alterar o total alvo e sem modificar o menor nem o maior valor da coluna.
 - Quando `business.enforce_charge_total_target` estiver habilitado, o total final de `cargas realizadas` deve fechar exatamente em `business.charge_total_target_kg`, mesmo sem cargas zeradas, sem alterar o furo de menor carga nem o de maior carga e sem criar valores fora desses limites.
 - No site, o usuário pode habilitar um alvo de carga realizada em kg e deve informar também uma carga mínima positiva por furo e o ID único do furo que receberá esse mínimo. O alvo substitui o alvo configurado apenas para a execução atual. A distribuição percorre todo o plano: fixa o furo identificado exatamente no mínimo informado, ajusta determinísticamente os demais furos intermediários dentro do intervalo mínimo-máximo, preserva exatamente a maior carga original do `InputedCharge` e todos os furos empatados nesse valor, e fecha o total final. O ID mínimo não pode pertencer ao grupo de máximos originais. Sem alvo habilitado, a execução mantém o comportamento padrão.
+- Ao anexar um `Config Final` legível, o site sugere automaticamente a menor carga positiva de `InputedCharge` e o primeiro `Number` correspondente nos campos de carga mínima e ID mínimo. Valores editados pelo usuário não são sobrescritos.
 - `X` e `Y` são preenchidos a partir do arquivo final e, se faltarem, do arquivo de projeto.
 - `Z (crest)` e `Z (toe)` devem refletir a geometria do arquivo final quando disponível.
 - O arquivo de saída é nomeado com o ID do plano.
@@ -33,6 +34,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 ## Validação
 - Verificar existência dos arquivos obrigatórios.
 - Verificar colunas mínimas do projeto e do realizado.
+- Verificar que a quantidade de furos exportados coincide com a quantidade de linhas do `Config Final` quando `business.include_eliminated` estiver habilitado; registrar no resumo as contagens de origem e saída.
 - Se houver cargas zeradas, exigir `business.charge_total_target_kg` e aplicar a redistribuição configurada sem alterar os extremos da coluna.
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
 - No site, rejeitar alvo ausente, não numérico ou menor/igual a zero; rejeitar carga mínima ausente, não numérica ou menor/igual a zero; rejeitar ID de furo vazio, inexistente ou duplicado; rejeitar ID que pertença ao grupo de máximos originais; rejeitar mínimo acima da maior carga da planilha e alvos que não possam ser distribuídos entre os limites preservados, com mensagem clara antes do download.

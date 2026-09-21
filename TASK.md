@@ -14,6 +14,7 @@ Regras operacionais atuais:
 - Em modo de teste, `tampao realizado` pode receber variação determinística de até `0,12` para mais ou para menos e `tampao previsto` / `tampao realizado` devem ser exportados com uma casa decimal.
 - Quando houver furos com `InputedCharge` zerado, a carga deve ser redistribuída com total alvo configurado, preservando o menor e o maior valor da coluna.
 - Quando `business.enforce_charge_total_target` estiver habilitado, a carga total aplicada deve fechar no alvo configurado mesmo sem furos zerados, preservando o menor e o maior valor da coluna.
+- O `Config Final` é a fonte autoritativa dos furos realizados: IDs presentes nele devem permanecer na saída mesmo que o `Projeto Completo` marque esses registros como `eliminated`. `business.include_eliminated` controla a exceção explícita e o resumo deve registrar as contagens de origem e saída.
 - A publicação no GitHub Pages deve operar sem inteligência artificial, chave de API ou serviço pago; o modo público processa os anexos localmente no navegador.
 - O site deve oferecer um bloco opcional para informar o total de carga realizada em kg, a carga mínima por furo e o ID do furo que receberá o mínimo; quando habilitado, deve distribuir a diferença em todo o plano, fixar esse mínimo no ID informado, preservar exatamente todos os furos empatados na maior carga original da planilha e fechar o total informado, validando combinações inviáveis e o conflito de um ID mínimo que já seja máximo.
 - A interface pública deve identificar as tabelas pelas colunas, validar a assinatura do PDF, rejeitar anexos duplicados/excessivos e gerar log local quando a validação falhar.
@@ -37,3 +38,4 @@ Critério objetivo de conclusão:
 - Quando o HISTO não for anexado, exigir o horário local informado no site e usar a data local do navegador; registrar no Excel e no log a identificação manual, o modo forçado, a fonte do horário, a fonte da data e a ausência do HISTO.
 - Registrar no Excel e no log o ID efetivamente encontrado no HISTO quando houver diferença.
 - Quando o bloco de carga-alvo estiver habilitado, registrar no Excel o total aplicado, a carga mínima, o ID do furo de menor carga, a maior carga preservada e o ID do furo de maior carga.
+- Ao anexar os dados no site, sugerir automaticamente a menor carga positiva de `InputedCharge` e o primeiro ID correspondente para os campos de carga mínima e ID mínimo, sem sobrescrever edições manuais.

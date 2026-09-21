@@ -18,12 +18,18 @@ const chargeMinimumInput = document.querySelector('#charge-minimum-input');
 const chargeMinimumError = document.querySelector('#charge-minimum-error');
 const chargeMinimumHoleInput = document.querySelector('#charge-minimum-hole-id');
 const chargeMinimumHoleError = document.querySelector('#charge-minimum-hole-error');
+const chargeMinimumSuggestion = document.querySelector('#charge-minimum-suggestion');
 const timezoneOffset = document.querySelector('#timezone-offset');
 const planIdentityInput = document.querySelector('#plan-identity');
 const manualFireTimeInput = document.querySelector('#manual-fire-time');
 const manualFireTimeError = document.querySelector('#manual-fire-time-error');
 const forceButton = document.querySelector('#force-submit');
 let attachedFiles = [];
+let chargeSuggestionToken = 0;
+let chargeSuggestionValues = null;
+let chargeMinimumWasEdited = false;
+let chargeMinimumHoleWasEdited = false;
+let applyingChargeSuggestion = false;
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
 const REQUIRED_FINAL = ['Number', 'X', 'Y', 'Z', 'X_Toe', 'Y_Toe', 'Z_Toe', 'Length', 'Stemming', 'Diameter', 'Subdrilling', 'Angle', 'Azimuth', 'DetonatingTime', 'InputedCharge'];
@@ -35,7 +41,7 @@ const ALIASES = {
   'Total_Charge (Kg)': 'Total_Charge_kg'
 };
 const BUSINESS = {
-  type: 'producao', fillMissingTime: true, stemmingVariation: true, stemmingMaxDelta: 0.12,
+  type: 'producao', includeEliminated: true, fillMissingTime: true, stemmingVariation: true, stemmingMaxDelta: 0.12,
   redistributeZeroCharges: true, chargeTarget: 17136.048, zeroChargeMinimum: 0.01,
   ...(window.PFR_BROWSER_CONFIG?.business || {})
 };
@@ -80,6 +86,7 @@ function syncInputFiles() {
   input.files = transfer.files;
   renderFiles(attachedFiles);
   syncActionControls();
+  void refreshChargeMinimumSuggestion();
 }
 
 function syncActionControls() {
@@ -144,6 +151,92 @@ function parseNumber(value) {
 
 function formatKg(value) {
   return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+}
+
+function setChargeMinimumSuggestionMessage(message = '') {
+  if (!chargeMinimumSuggestion) return;
+  chargeMinimumSuggestion.textContent = message;
+  chargeMinimumSuggestion.hidden = !message;
+}
+
+function clearAutomaticChargeSuggestion() {
+  if (chargeSuggestionValues && !chargeMinimumWasEdited && chargeMinimumInput.value === chargeSuggestionValues.minimumText) {
+    chargeMinimumInput.value = '';
+  }
+  if (chargeSuggestionValues && !chargeMinimumHoleWasEdited && chargeMinimumHoleInput.value === chargeSuggestionValues.holeText) {
+    chargeMinimumHoleInput.value = '';
+  }
+  chargeSuggestionValues = null;
+}
+
+function applyChargeMinimumSuggestion(minimum, holeId, sourceName) {
+  const minimumText = Number(minimum).toFixed(2);
+  const holeText = String(holeId);
+  const previous = chargeSuggestionValues;
+  const canSetMinimum = !chargeMinimumWasEdited
+    || !chargeMinimumInput.value
+    || (previous && chargeMinimumInput.value === previous.minimumText);
+  const canSetHole = !chargeMinimumHoleWasEdited
+    || !chargeMinimumHoleInput.value
+    || (previous && chargeMinimumHoleInput.value === previous.holeText);
+
+  applyingChargeSuggestion = true;
+  if (canSetMinimum) chargeMinimumInput.value = minimumText;
+  if (canSetHole) chargeMinimumHoleInput.value = holeText;
+  applyingChargeSuggestion = false;
+  chargeSuggestionValues = { minimumText, holeText };
+
+  const manualNote = canSetMinimum && canSetHole
+    ? ' Os campos foram preenchidos automaticamente.'
+    : ' Valores digitados manualmente foram preservados.';
+  setChargeMinimumSuggestionMessage(
+    `Sugestão automática do ${sourceName}: ${formatKg(minimum)} kg no furo ${holeText}.${manualNote}`
+  );
+}
+
+async function refreshChargeMinimumSuggestion() {
+  const token = ++chargeSuggestionToken;
+  const tableFiles = attachedFiles.filter(file => /\.(csv|xlsx|xlsm)$/i.test(file.name));
+  if (!tableFiles.length) {
+    clearAutomaticChargeSuggestion();
+    setChargeMinimumSuggestionMessage();
+    return;
+  }
+
+  let parsedTables;
+  try {
+    parsedTables = await Promise.all(tableFiles.map(async file => ({ file, rows: await readTable(file) })));
+  } catch (_error) {
+    if (token === chargeSuggestionToken) {
+      setChargeMinimumSuggestionMessage('A sugestão aparecerá quando o Config Final.csv estiver anexado e legível.');
+    }
+    return;
+  }
+  if (token !== chargeSuggestionToken) return;
+
+  const namedFinal = parsedTables.find(item => /config\s*final/i.test(item.file.name) && hasColumns(item.rows, REQUIRED_FINAL));
+  const finalEntry = namedFinal || parsedTables.find(item => hasColumns(item.rows, REQUIRED_FINAL));
+  if (!finalEntry) {
+    setChargeMinimumSuggestionMessage('Anexe o Config Final.csv para preencher a sugestão de carga mínima.');
+    return;
+  }
+
+  const candidates = finalEntry.rows
+    .map(row => ({ id: parseNumber(row.Number), charge: parseNumber(row.InputedCharge) }))
+    .filter(item => item.id !== null && item.charge !== null && item.charge > 0);
+  if (!candidates.length) {
+    setChargeMinimumSuggestionMessage('Não foi encontrada carga positiva no Config Final.csv para sugerir um mínimo.');
+    return;
+  }
+
+  const minimum = Math.min(...candidates.map(item => item.charge));
+  const minimumCandidate = candidates.find(item => item.charge === minimum);
+  const minimumIdCount = finalEntry.rows.filter(row => key(row.Number) === key(minimumCandidate.id)).length;
+  if (minimumIdCount !== 1) {
+    setChargeMinimumSuggestionMessage(`A sugestão não foi aplicada porque o ID ${minimumCandidate.id} aparece mais de uma vez no Config Final.csv.`);
+    return;
+  }
+  applyChargeMinimumSuggestion(minimum, minimumCandidate.id, finalEntry.file.name);
 }
 
 function setChargeTargetError(message = '') {
@@ -241,8 +334,14 @@ function readManualFireTime() {
 
 chargeTargetToggle.addEventListener('change', syncChargeTargetControls);
 chargeTargetInput.addEventListener('input', () => setChargeTargetError());
-chargeMinimumInput.addEventListener('input', () => setChargeMinimumError());
-chargeMinimumHoleInput.addEventListener('input', () => setChargeMinimumHoleError());
+chargeMinimumInput.addEventListener('input', () => {
+  if (!applyingChargeSuggestion) chargeMinimumWasEdited = true;
+  setChargeMinimumError();
+});
+chargeMinimumHoleInput.addEventListener('input', () => {
+  if (!applyingChargeSuggestion) chargeMinimumHoleWasEdited = true;
+  setChargeMinimumHoleError();
+});
 syncChargeTargetControls();
 
 function key(value) {
@@ -379,8 +478,10 @@ function findUniqueHoleIndex(rows, holeId) {
 
 function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
   const projects = new Map(projectRows.map(row => [key(row.Number), row]));
-  const merged = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }))
-    .filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0)
+  const mergedCandidates = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }));
+  const merged = (BUSINESS.includeEliminated
+    ? mergedCandidates
+    : mergedCandidates.filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0))
     .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
   const numbers = merged.map(row => parseNumber(row.Number));
   const times = window.OpenBlastTiming.fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
@@ -427,7 +528,12 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
         subfuracao: parseNumber(row.Subdrilling) ?? parseNumber(row.Subdrilling_m), diametro: diameter, 'tempo detonacao (ms)': times[index]
       };
     });
-    return { data, chargeMetadata };
+    return {
+      data,
+      chargeMetadata,
+      sourceFinalRows: finalRows.length,
+      excludedRows: mergedCandidates.length - merged.length
+    };
   });
 }
 
@@ -459,7 +565,9 @@ function buildWorkbook(data, sources, event, chargeOptions = {}, chargeSummary =
     ['Fonte da data', event.dateSource === 'browser' ? 'Data local do navegador no momento da execução' : 'HISTO'],
     ['Historial da DRB', event.historySource === 'missing' ? 'Não anexado — execução forçada' : 'Anexado'],
     ['Fonte do horário', event.timeSource === 'force-default' ? 'Fallback da execução forçada — 12:00:00' : event.timeSource === 'manual' ? 'Horário informado pelo usuário' : 'HISTO'],
-    ['Modo de execução', event.forced ? 'Forçada' : 'Validação automática']
+    ['Modo de execução', event.forced ? 'Forçada' : 'Validação automática'],
+    ['Furos no Config Final', sources.finalRows.length],
+    ['Furos exportados', data.length]
   ];
   if (event.planIdentity) summaryRows.push(['Identificação informada', event.planIdentity]);
   if (event.histoPlanId) summaryRows.push(['ID identificado no HISTO', event.histoPlanId]);
@@ -522,9 +630,14 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   if (timing.some(value => !Number.isInteger(value) || value < 0)) throw new Error('Há furos sem uma temporização inteira e não negativa após a simulação.');
   if (new Set(timing).size !== timing.length) throw new Error('Há furos com temporização repetida após a simulação.');
   const chargeSummary = chargeOptions.enabled ? summarizeChargeDistribution(data, chargeOptions, builtRows.chargeMetadata) : null;
+  if (BUSINESS.includeEliminated && data.length !== finalRows.length) {
+    throw new Error(`A quantidade de furos exportados (${data.length}) divergiu do Config Final (${finalRows.length}).`);
+  }
   return {
     workbook: buildWorkbook(data, sources, event, chargeOptions, chargeSummary), event, rows: data.length,
     totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0),
+    sourceFinalRows: builtRows.sourceFinalRows,
+    excludedRows: builtRows.excludedRows,
     chargeTargetApplied: Boolean(chargeOptions.enabled), chargeTarget: chargeOptions.target,
     chargeMinimum: chargeSummary?.minimum, chargeMinimumHoleId: chargeSummary?.minimumHoleId,
     chargeMaximum: chargeSummary?.maximum, chargeMaximumHoleId: chargeSummary?.maximumHoleId
@@ -550,7 +663,9 @@ async function runGeneration(force = false) {
   button.disabled = true; if (forceButton) forceButton.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
     generationOptions.manualFireTime = readManualFireTime();
-    const generated = await generateLocally(attachedFiles, readChargeTarget(), { timezoneOffset: readTimezoneOffset() }, generationOptions);
+    await refreshChargeMinimumSuggestion();
+    const chargeOptions = readChargeTarget();
+    const generated = await generateLocally(attachedFiles, chargeOptions, { timezoneOffset: readTimezoneOffset() }, generationOptions);
     setProgress(88, 'Gerando o arquivo Excel...');
     const filename = generated.event.planId
       ? `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`
@@ -584,7 +699,7 @@ async function runGeneration(force = false) {
       result.append(targetNote);
     }
     const metrics = document.createElement('div'); metrics.className = 'metrics';
-    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${formatKg(generated.totalCharge)} kg`]];
+    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Furos no Config Final', generated.sourceFinalRows.toLocaleString('pt-BR')], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${formatKg(generated.totalCharge)} kg`]];
     metricsData.push(['Fuso horário', generated.event.timezoneOffset || (generated.event.timeSource ? 'Horário local informado' : 'Original')]);
     metricsData.push(['Fonte da data', generated.event.dateSource === 'browser' ? 'Data local do navegador' : 'HISTO']);
     metricsData.push(['Historial da DRB', generated.event.historySource === 'missing' ? 'Não anexado (forçada)' : 'Anexado']);

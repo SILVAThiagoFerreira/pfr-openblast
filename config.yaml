@@ -27,6 +27,9 @@ inputs:
 
 business:
   output_type_label: "producao"
+  # O Config Final define os furos realizados; nao remover seus IDs porque
+  # o Projeto Completo marcou o registro como eliminated.
+  include_eliminated: true
   plan_id_source: "auto"
   plan_id_regex: "(?:pp)?(\\d{6,8}(?:[_-][A-Z])?)"
   fallback_plan_id: "320526"

@@ -36,6 +36,11 @@ Campos principais:
 - `InputedCharge` float
 - `eliminated` integer, optional
 
+Regra de cardinalidade:
+- `Config Final` é a fonte autoritativa dos IDs realizados. Com `business.include_eliminated: true` (padrão), registros presentes no `Config Final` são exportados mesmo quando o `Projeto Completo` informa `eliminated == 1`.
+- Quando `business.include_eliminated: false`, os registros eliminados podem ser excluídos de forma explícita; o resumo e o log registram a quantidade excluída.
+- Com a inclusão habilitada, `Furos no Config Final` deve ser igual a `Furos exportados`.
+
 ## Simulação de teste
 - `tampao previsto` e `tampao realizado` são exportados com uma casa decimal.
 - `tampao realizado` pode receber variação determinística de até `0,12` para mais ou para menos quando habilitado na configuração.
@@ -51,6 +56,7 @@ Campos principais:
 - O menor e o maior valor de carga devem permanecer inalterados.
 - Nenhum valor ajustado pode ficar abaixo do menor valor preservado nem acima do maior valor preservado.
 - No site, o bloco opcional de carga realizada fornece o alvo da execução atual e tem precedência sobre a configuração. Quando habilitado, `chargeTarget` deve ser positivo, `chargeMinimum` deve ser positivo e `chargeMinimumHoleId` deve identificar exatamente um `Number` presente na saída. Esse furo recebe exatamente `chargeMinimum` e não pode pertencer ao grupo de máximos originais; a maior carga e todos os furos empatados nela são obtidos do `InputedCharge` original e preservados exatamente. Os demais furos intermediários são ajustados de forma determinística em todo o plano, sempre no intervalo `[chargeMinimum, maior carga original]`, e a soma final fecha no alvo. O Excel registra `Carga-alvo aplicado (kg)`, `Carga mínima aplicada (kg)`, `ID do furo de menor carga`, `Carga máxima preservada (kg)` e o `ID do furo de maior carga` original. Sem o bloco habilitado, a regra pública permanece desativada.
+- Ao anexar um `Config Final` legível, a interface sugere `chargeMinimum` como a menor carga positiva de `InputedCharge` e `chargeMinimumHoleId` como o primeiro `Number` que possui esse valor. A sugestão é apenas um preenchimento inicial e não substitui edição manual.
 
 ## Historico de disparo
 Arquivo: `HISTO-*.txt` ou `*_histo.log`; obrigatório no modo automático e opcional no modo forçado

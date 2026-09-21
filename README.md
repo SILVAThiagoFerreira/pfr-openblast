@@ -7,7 +7,7 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 2. Valida estrutura e colunas.
 3. Cria backup dos insumos.
 4. Resolve ID do plano e data/hora do disparo.
-5. Consolida os dados e aplica as regras de negócio, incluindo preenchimento determinístico de `tempo detonacao (ms)` vazio, negativo, inválido ou repetido pela posição do furo na sequência `Number`, garantindo tempos inteiros e únicos; também faz o fechamento opcional da carga total aplicada ao alvo configurado preservando os extremos da coluna e, no site, permite fixar a carga mínima e o ID do furo que a receberá, mantendo a maior carga original da planilha; em modo de teste, aplica variação controlada de `tampao realizado` com exportação de `tampao previsto` / `tampao realizado` em uma casa decimal.
+5. Consolida os dados e aplica as regras de negócio, mantendo como fonte de cardinalidade todos os furos presentes no `Config Final` mesmo quando o `Projeto Completo` marca um ID como `eliminated` (regra `business.include_eliminated`); também faz o preenchimento determinístico de `tempo detonacao (ms)` vazio, negativo, inválido ou repetido pela posição do furo na sequência `Number`, garantindo tempos inteiros e únicos. O fluxo faz o fechamento opcional da carga total aplicada ao alvo configurado preservando os extremos da coluna e, no site, permite fixar a carga mínima e o ID do furo que a receberá, mantendo a maior carga original da planilha; em modo de teste, aplica variação controlada de `tampao realizado` com exportação de `tampao previsto` / `tampao realizado` em uma casa decimal.
 6. Exporta o Excel final com rastreabilidade.
 
 ## Entradas
@@ -57,6 +57,8 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`; se a geração for acionada sem anexos, informa o próximo passo no próprio resultado, sem iniciar processamento vazio.
 - O campo opcional `ID / nome do plano de fogo em trabalho` permite informar a identificação desejada para o Excel. O campo `Horário local do desmonte` permite corrigir uma ausência ou ambiguidade de horário. Quando a divergência for somente entre meses do ID ou o HISTO não for anexado, o botão `Forçar execução` pede confirmação, mantém as validações operacionais e registra o ID informado, a fonte do horário, a fonte da data e a ausência do histórico no resumo/log.
 - Ao habilitar o total de carga realizada, o usuário também informa a carga mínima por furo e o `ID do furo de menor carga`. Esse furo recebe exatamente o mínimo informado; os demais furos intermediários são ajustados de forma determinística em todo o plano, sem ultrapassar o mínimo ou a maior carga. A maior carga e todos os furos empatados no maior valor são lidos do `InputedCharge` da planilha e preservados sem edição; o ID mínimo é rejeitado se estiver nesse grupo máximo.
+- Assim que o `Config Final` é anexado e lido, a interface sugere automaticamente a menor carga positiva e o primeiro ID correspondente nos campos de carga mínima e ID mínimo. Se o usuário já tiver editado um dos campos, esse valor é preservado.
+- O resumo do Excel mostra `Furos no Config Final` e `Furos exportados`, permitindo conferir imediatamente a cardinalidade do resultado; quando `business.include_eliminated` estiver ativo, os dois valores devem ser iguais.
 
 ### Organização da interface online
 

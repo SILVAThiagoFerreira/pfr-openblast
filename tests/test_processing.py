@@ -13,10 +13,23 @@ if str(SRC) not in sys.path:
 
 from pfr.config import load_config, normalize_config  # noqa: E402
 from pfr.export import export_workbook  # noqa: E402
-from pfr.processing import _fill_missing_detonating_time, build_output_frame, extract_blast_datetime, extract_plan_id  # noqa: E402
+from pfr.processing import _fill_missing_detonating_time, build_output_frame, extract_blast_datetime, extract_plan_id, merge_frames  # noqa: E402
 
 
 class ProcessingTest(unittest.TestCase):
+    def test_config_final_rows_are_kept_when_project_marks_them_eliminated(self):
+        project = pd.DataFrame({"Number": [1, 2, 3], "eliminated": [0, 1, 0]})
+        final = pd.DataFrame({"Number": [1, 2, 3]})
+
+        included = merge_frames(project, final, {"business": {"include_eliminated": True}})
+        excluded = merge_frames(project, final, {"business": {"include_eliminated": False}})
+
+        self.assertEqual(included["Number"].tolist(), [1, 2, 3])
+        self.assertEqual(excluded["Number"].tolist(), [1, 3])
+        self.assertEqual(included.attrs["source_final_count"], 3)
+        self.assertEqual(included.attrs["included_eliminated_count"], 1)
+        self.assertEqual(excluded.attrs["excluded_eliminated_count"], 1)
+
     def test_negative_detonating_time_is_imputed_from_sequence(self):
         result, imputed = _fill_missing_detonating_time(pd.Series([1000, -1, -5, 1300]), True)
 

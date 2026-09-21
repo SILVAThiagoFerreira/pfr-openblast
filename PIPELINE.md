@@ -10,8 +10,9 @@
 8. Aplicar o offset de fuso configurado (por exemplo, `-03:00`) ao instante do HISTO antes de montar a saída e registrar a conversão no resumo.
    - Se o HISTO estiver ausente no modo forçado, exigir o horário local informado no site e usar a data local do navegador; esse horário não recebe conversão adicional de fuso.
 9. Se houver mais de um bloco compatível, priorizar mês coincidente; se a ambiguidade permanecer, interromper e listar os candidatos, sem escolher um bloco arbitrariamente.
-10. Ler o projeto e o realizado.
-11. Mesclar os dados pelo `Number`.
+10. Ler o projeto e o realizado. O `Config Final` é a fonte autoritativa da cardinalidade da saída.
+11. Mesclar os dados pelo `Number`, mantendo todo `Number` presente no `Config Final`; `business.include_eliminated` permite uma exclusão operacional explícita e a quantidade de exclusões é registrada.
+    - Quando a inclusão estiver habilitada, interromper a execução se a quantidade final divergir da quantidade de linhas do `Config Final`.
 12. Normalizar `DetonatingTime`: valores vazios, não numéricos, negativos (inclusive `-1`) e repetições posteriores são posições sem tempo. Ordenar os furos por `Number`, analisar as âncoras anterior/posterior e preencher cada bloco com tempos inteiros determinísticos, sempre únicos; se o intervalo não comportar todos os valores, extrapolar deterministicamente para manter a unicidade.
 13. Redistribuir cargas zeradas quando configurado, preservando o total alvo e os extremos da coluna.
 14. Fechar o total de `cargas realizadas` ao alvo configurado quando `business.enforce_charge_total_target` estiver habilitado, preservando o menor e o maior valor da coluna.
@@ -26,6 +27,7 @@
 
 21. No modo online, aceitar a identificação manual opcional do plano e registrar o valor no resumo/log.
 22. Disponibilizar `Forçar execução` como ação explícita e confirmada para divergências de ID ou ausência do HISTO; no segundo caso, exigir horário local informado pelo usuário e usar a data local do navegador. Em ambos os casos, manter todas as validações estruturais e registrar o ID informado, a fonte do horário, a fonte da data e se o HISTO foi anexado.
+23. Ao anexar tabelas no modo online, ler o `Config Final` e preencher uma sugestão de carga mínima positiva e o primeiro ID correspondente; preservar campos que o usuário já editou manualmente.
 
 ### Modo online incremental
 As seleções sucessivas são acumuladas em memória, com deduplicação por nome, tamanho e data de modificação. A remoção atualiza imediatamente o conjunto submetido. Antes de escolher o evento do HISTO, o pipeline coleta IDs candidatos dos nomes e das primeiras linhas das tabelas e cruza-os com o bloco de plano usando a composição `PLANO;MÊS;ANO`: zeros à esquerda e separadores são normalizados, o ano é preservado e o mês não impede a associação.

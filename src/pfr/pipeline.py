@@ -73,7 +73,19 @@ def run(
     final = load_final_frame(sources.final)
     merged = merge_frames(project, final, cfg)
     data = build_output_frame(merged, plan_id, blast_date, blast_time, cfg)
+    if bool(cfg["business"].get("include_eliminated", True)) and len(data) != len(final):
+        raise ValueError(
+            "A quantidade de furos exportados divergiu do Config Final: "
+            f"{len(data)} de {len(final)}."
+        )
     validate_output(data, merged["r_explosive"], cfg)
+    logger.info(
+        "Furos: Config Final=%s | exportados=%s | eliminated mantidos=%s | eliminated excluidos=%s",
+        len(final),
+        len(data),
+        merged.attrs.get("included_eliminated_count", 0),
+        merged.attrs.get("excluded_eliminated_count", 0),
+    )
     if merged.attrs.get("imputed_detonating_time_count", 0):
         logger.info("Tempo detonacao imputado em %s furos", merged.attrs["imputed_detonating_time_count"])
     if merged.attrs.get("stemming_variation_count", 0):

@@ -25,6 +25,11 @@ def normalize_config(raw: dict, root: Path) -> dict:
     cfg.setdefault("export", {})
     cfg.setdefault("logging", {})
 
+    # O Config Final e a fonte autoritativa dos furos realizados. O campo
+    # `eliminated` do Projeto Completo continua disponivel para auditoria,
+    # mas nao pode remover silenciosamente um furo que exista no realizado.
+    cfg["business"].setdefault("include_eliminated", True)
+
     cfg["paths"]["project_root"] = resolve_path(root, cfg["paths"].get("project_root", "."))
     for key in ("input_root", "output_root", "backup_root", "log_root"):
         cfg["paths"][key] = resolve_path(cfg["paths"]["project_root"], cfg["paths"].get(key))

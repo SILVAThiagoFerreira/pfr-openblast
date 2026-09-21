@@ -47,6 +47,7 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /for="charge-minimum-input"[^>]*>Carga mínima por furo/);
   assert.match(html, /id="charge-minimum-hole-id"/);
   assert.match(html, /for="charge-minimum-hole-id"[^>]*>ID do furo de menor carga/);
+  assert.match(html, /id="charge-minimum-suggestion"/);
   assert.match(html, /Máximo preservado/);
   assert.match(html, /force-execution\.css/);
   assert.match(html, /\.\/modelos\/modelo-pre-corte-sem-furos\.xlsx/);
@@ -69,9 +70,12 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /maximumIndexes/);
   assert.match(app, /chargeMetadata/);
   assert.match(app, /não pode pertencer a um furo de maior carga original/);
+  assert.match(app, /includeEliminated/);
+  assert.match(app, /refreshChargeMinimumSuggestion/);
+  assert.match(app, /Furos no Config Final/);
 }
 
-for (const file of ['index.html', 'app.js', 'plan-id.js', 'force-execution.css', 'styles.css', 'charge.js']) {
+for (const file of ['index.html', 'app.js', 'config.js', 'plan-id.js', 'force-execution.css', 'styles.css', 'charge.js']) {
   assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 

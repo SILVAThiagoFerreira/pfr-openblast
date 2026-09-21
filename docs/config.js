@@ -5,6 +5,7 @@ window.PFR_PROCESSING_MODE = 'browser';
 window.PFR_BROWSER_CONFIG = {
   business: {
     type: 'producao',
+    includeEliminated: true,
     fillMissingTime: true,
     stemmingVariation: true,
     stemmingMaxDelta: 0.12,

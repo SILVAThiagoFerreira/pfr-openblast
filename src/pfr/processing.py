@@ -716,10 +716,24 @@ def merge_frames(project: pd.DataFrame, final: pd.DataFrame, cfg: dict | None = 
     merged["r_subdrilling"] = _series_or_na(merged, "r_subdrilling")
     merged["p_subdrilling"] = _series_or_na(merged, "p_subdrilling")
     merged["DetonatingTime"] = _series_or_na(merged, "DetonatingTime")
-    include_eliminated = bool(cfg and cfg.get("business", {}).get("include_eliminated", False))
-    if "eliminated" in merged.columns and not include_eliminated:
+    include_eliminated = bool(
+        cfg.get("business", {}).get("include_eliminated", True)
+        if cfg
+        else True
+    )
+    eliminated_values = (
+        pd.to_numeric(merged["eliminated"], errors="coerce").fillna(0)
+        if "eliminated" in merged.columns
+        else pd.Series(0, index=merged.index, dtype="float64")
+    )
+    eliminated_mask = eliminated_values.ne(0)
+    excluded_eliminated_count = int(eliminated_mask.sum()) if not include_eliminated else 0
+    if not include_eliminated and "eliminated" in merged.columns:
         merged = merged[pd.to_numeric(merged["eliminated"], errors="coerce").fillna(0) == 0].copy()
     merged = merged.sort_values("Number").reset_index(drop=True)
+    merged.attrs["source_final_count"] = len(final)
+    merged.attrs["included_eliminated_count"] = int(eliminated_mask.sum()) if include_eliminated else 0
+    merged.attrs["excluded_eliminated_count"] = excluded_eliminated_count
     return merged
 
 
@@ -786,7 +800,13 @@ def build_summary(merged: pd.DataFrame, data: pd.DataFrame, plan_id: str, blast_
         ["Plano", plan_id],
         ["Data", blast_date],
         ["Hora", blast_time],
+        ["Furos no Config Final", int(merged.attrs.get("source_final_count", len(data)))],
+        ["Furos exportados", len(data)],
     ]
+    if merged.attrs.get("included_eliminated_count", 0):
+        rows.append(["Furos marcados eliminated mantidos", int(merged.attrs["included_eliminated_count"])])
+    if merged.attrs.get("excluded_eliminated_count", 0):
+        rows.append(["Furos marcados eliminated excluidos", int(merged.attrs["excluded_eliminated_count"])])
     if sources.get("timezone_offset") is not None:
         rows.append(["Fuso do HISTO", sources["timezone_offset"]])
     return pd.DataFrame(rows, columns=["Campo", "Valor"])
