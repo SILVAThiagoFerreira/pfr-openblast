@@ -53,3 +53,10 @@ Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite re
 - Formatos e nomes fixos via configuração.
 - Backup por timestamp.
 - Plano, data e hora devem ser reprodutíveis a partir de `config.yaml` e do bloco correspondente no `HISTO-*.txt`; na execução forçada sem HISTO, o resumo registra o ID, o horário informado e a data local do navegador usados como fontes alternativas.
+
+## Modelos de apoio publicados
+Na interface pública, a seção recolhível de modelos deve disponibilizar exatamente os três arquivos oficiais, com `href` e atributo `download` preservando os nomes originais:
+
+- `Plano de Fogo - PC.xls` — Modelo - Pré-Corte - SEM FUROS;
+- `Plano de Fogo Realizado - PP.xlsx` — Modelo - Produção;
+- `Plano Realizado - REG .xls` — Modelo - Regularização.

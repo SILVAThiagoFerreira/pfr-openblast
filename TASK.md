@@ -21,7 +21,7 @@ Regras operacionais atuais:
 - A interface pública deve orientar os cinco arquivos: Config Final.csv, Projeto Completo.csv, Historial da DRB, Plano de Perfuração.xlsx e Plano de Perfuração.pdf; no modo forçado, o Historial da DRB pode ser omitido.
 - O histórico da DRB deve aceitar o padrão `*_histo.log`, com blocos `[StartProcedure]`, linhas `BP:` e eventos `[Fire]`.
 - O site deve oferecer conversão de fuso no processamento, com `UTC-03:00` como opção padrão e o resultado registrado no Excel.
-- O site deve disponibilizar os modelos “Modelo - Pré-Corte - SEM FUROS” e “Modelo - Produção” para download.
+- O site deve disponibilizar exatamente os três modelos oficiais para download, preservando os nomes originais: “Plano de Fogo - PC.xls” (Modelo - Pré-Corte - SEM FUROS), “Plano de Fogo Realizado - PP.xlsx” (Modelo - Produção) e “Plano Realizado - REG .xls” (Modelo - Regularização).
 
 Critério objetivo de conclusão:
 - o projeto possui documentação completa;

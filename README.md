@@ -64,6 +64,8 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 
 O fluxo público é organizado em uma única área operacional: o tutorial dos cinco tipos de entrada, as opções de saída e os modelos de apoio ficam recolhíveis para manter a tela compacta. A identificação e o horário permanecem visíveis, enquanto fuso e distribuição de carga ficam em opções avançadas. Os anexos continuam incrementais e o log considera a lista completa de arquivos já adicionados.
 
+A seção **Modelos de apoio** publica os três arquivos oficiais com os nomes originais preservados no download: `Plano de Fogo - PC.xls` (Pré-Corte - SEM FUROS), `Plano de Fogo Realizado - PP.xlsx` (Produção) e `Plano Realizado - REG .xls` (Regularização).
+
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.
 

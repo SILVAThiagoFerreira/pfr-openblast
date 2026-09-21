@@ -50,12 +50,34 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /id="charge-minimum-suggestion"/);
   assert.match(html, /Máximo preservado/);
   assert.match(html, /force-execution\.css/);
-  assert.match(html, /\.\/modelos\/modelo-pre-corte-sem-furos\.xlsx/);
-  assert.match(html, /\.\/modelos\/modelo-producao\.xls/);
+  const expectedModels = [
+    {
+      href: './modelos/Plano%20de%20Fogo%20-%20PC.xls',
+      download: 'Plano de Fogo - PC.xls',
+      filename: 'Plano de Fogo - PC.xls',
+    },
+    {
+      href: './modelos/Plano%20de%20Fogo%20Realizado%20-%20PP.xlsx',
+      download: 'Plano de Fogo Realizado - PP.xlsx',
+      filename: 'Plano de Fogo Realizado - PP.xlsx',
+    },
+    {
+      href: './modelos/Plano%20Realizado%20-%20REG%20.xls',
+      download: 'Plano Realizado - REG .xls',
+      filename: 'Plano Realizado - REG .xls',
+    },
+  ];
+  for (const model of expectedModels) {
+    assert.ok(html.includes(`href="${model.href}" download="${model.download}"`), `${model.download} link must preserve the source filename`);
+    assert.equal(fs.existsSync(path.join(root, 'modelos', model.filename)), true, `${model.filename} must exist`);
+  }
+  assert.deepEqual(
+    fs.readdirSync(path.join(root, 'modelos')).sort(),
+    expectedModels.map((model) => model.filename).sort(),
+    'only the three authoritative model files should be published',
+  );
   assert.match(app, /\.(?:txt|log)/);
   assert.match(app, /Historial da DRB/);
-  assert.equal(fs.existsSync(path.join(root, 'modelos', 'modelo-pre-corte-sem-furos.xlsx')), true);
-  assert.equal(fs.existsSync(path.join(root, 'modelos', 'modelo-producao.xls')), true);
   assert.equal(fs.existsSync(path.join(root, 'force-execution.css')), true);
   assert.match(app, /parseManualPlanId/);
   assert.match(app, /manualFireTime/);
