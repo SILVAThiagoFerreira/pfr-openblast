@@ -795,18 +795,5 @@ def build_output_frame(merged: pd.DataFrame, plan_id: str, blast_date: str, blas
     return data
 
 
-def build_summary(merged: pd.DataFrame, data: pd.DataFrame, plan_id: str, blast_date: str, blast_time: str, sources: dict) -> pd.DataFrame:
-    rows = [
-        ["Plano", plan_id],
-        ["Data", blast_date],
-        ["Hora", blast_time],
-        ["Furos no Config Final", int(merged.attrs.get("source_final_count", len(data)))],
-        ["Furos exportados", len(data)],
-    ]
-    if merged.attrs.get("included_eliminated_count", 0):
-        rows.append(["Furos marcados eliminated mantidos", int(merged.attrs["included_eliminated_count"])])
-    if merged.attrs.get("excluded_eliminated_count", 0):
-        rows.append(["Furos marcados eliminated excluidos", int(merged.attrs["excluded_eliminated_count"])])
-    if sources.get("timezone_offset") is not None:
-        rows.append(["Fuso do HISTO", sources["timezone_offset"]])
-    return pd.DataFrame(rows, columns=["Campo", "Valor"])
+def build_summary(plan_id: str, blast_date: str, blast_time: str) -> pd.DataFrame:
+    return pd.DataFrame([[plan_id, blast_date, blast_time]], columns=["Plano", "Data", "Hora"])

@@ -17,7 +17,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Se mais de um bloco `[BlastingPlan]` for compatível com o mesmo plano e ano, priorizar o bloco cujo mês coincida com o ID de origem; permanecendo mais de um candidato, abortar com erro explícito de ambiguidade.
 - A data/hora do disparo não deve vir do último `[Fire]` do histórico inteiro. O sistema deve localizar o bloco `[BlastingPlan]` que contém o plano operacional, por exemplo `PP320526`, e usar o primeiro evento `[Fire]` posterior a esse bloco.
 - No novo histórico, o sistema também deve localizar o bloco `[StartProcedure]` que contenha a linha `BP: PP<plano>` e usar o primeiro `[Fire]` posterior dentro desse bloco. Cabeçalhos com espaços, `BP:` e múltiplos eventos `[Fire]` são aceitos.
-- A conversão de fuso é explícita. O offset selecionado (por exemplo, `-03:00`) deve ser aplicado ao instante do HISTO antes da gravação no Excel e identificado no resumo.
+- A conversão de fuso é explícita. O offset selecionado (por exemplo, `-03:00`) deve ser aplicado ao instante do HISTO antes da gravação no Excel e identificado nos detalhes do resultado da página.
 - IDs numéricos presentes em linhas de teste, detonadores ou eventos como `TestDetsResult` não são IDs de plano e não podem nomear a saída.
 - O `Config Final.csv` é a fonte autoritativa dos furos realizados: todo `Number` presente nele entra na saída, mesmo que o mesmo ID esteja com `eliminated == 1` no `Projeto Completo.csv`. A configuração `business.include_eliminated` fica `true` por padrão; somente uma configuração explícita como `false` pode excluir esses registros, e a quantidade excluída deve permanecer auditável.
 - O campo `eliminated` é tratado como opcional no arquivo de projeto; quando ausente, a validação não bloqueia a execução.
@@ -34,25 +34,26 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 ## Validação
 - Verificar existência dos arquivos obrigatórios.
 - Verificar colunas mínimas do projeto e do realizado.
-- Verificar que a quantidade de furos exportados coincide com a quantidade de linhas do `Config Final` quando `business.include_eliminated` estiver habilitado; registrar no resumo as contagens de origem e saída.
+- Verificar que a quantidade de furos exportados coincide com a quantidade de linhas do `Config Final` quando `business.include_eliminated` estiver habilitado; registrar as contagens de origem e saída no log.
 - Se houver cargas zeradas, exigir `business.charge_total_target_kg` e aplicar a redistribuição configurada sem alterar os extremos da coluna.
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
 - No site, rejeitar alvo ausente, não numérico ou menor/igual a zero; rejeitar carga mínima ausente, não numérica ou menor/igual a zero; rejeitar ID de furo vazio, inexistente ou duplicado; rejeitar ID que pertença ao grupo de máximos originais; rejeitar mínimo acima da maior carga da planilha e alvos que não possam ser distribuídos entre os limites preservados, com mensagem clara antes do download.
 - Validar que todos os tempos de detonação exportados sejam inteiros, não negativos, preenchidos e únicos.
-- Abortar com erro claro se algo crítico faltar. No modo automático, o HISTO e um evento `[Fire]` identificável são obrigatórios. No modo forçado, o HISTO pode ser omitido somente quando houver um ID de plano válido e o usuário informar o horário local do desmonte; nesse caso, a data usada é a data local do navegador no momento da execução.
+- Abortar com erro claro se algo crítico faltar. No modo automático, o HISTO e um evento `[Fire]` identificável são obrigatórios. No modo forçado, o HISTO pode ser omitido somente quando houver um ID de plano válido e o usuário informar a data e o horário locais do desmonte; nenhum deles é substituído pela data do computador.
+- A aba `Resumo` do Excel deve conter somente as colunas `Plano`, `Data` e `Hora`, com uma linha de valores.
 
 ## Identificação pública do plano
 No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`. O prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade do plano. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que tenha o mesmo plano e ano das pistas dos arquivos/tabelas anexados, mesmo quando o mês de emissão for diferente do mês da detonação.
 
 O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado.
 
-Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e pode ignorar a divergência de identificação ou a ausência total do HISTO. Sem HISTO, o horário local informado no site e a data local do navegador são usados, sem conversão adicional de fuso; o ID, as colunas, o PDF, os furos e as temporizações continuam sendo validados.
+Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e pode ignorar a divergência de identificação ou a ausência total do HISTO. Sem HISTO, a data e o horário locais informados no site são obrigatórios e não recebem conversão de fuso; o ID, as colunas, o PDF, os furos e as temporizações continuam sendo validados.
 
 ## Determinismo
 - Ordenação por `Number`.
 - Formatos e nomes fixos via configuração.
 - Backup por timestamp.
-- Plano, data e hora devem ser reprodutíveis a partir de `config.yaml` e do bloco correspondente no `HISTO-*.txt`; na execução forçada sem HISTO, o resumo registra o ID, o horário informado e a data local do navegador usados como fontes alternativas.
+- Plano, data e hora devem ser reprodutíveis a partir de `config.yaml` e do bloco correspondente no `HISTO-*.txt`; na execução forçada sem HISTO, a data e o horário inseridos pelo usuário são as fontes explícitas do evento.
 
 ## Modelos de apoio publicados
 Na interface pública, a seção recolhível de modelos deve disponibilizar exatamente os três arquivos oficiais, com `href` e atributo `download` preservando os nomes originais:

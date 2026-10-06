@@ -81,9 +81,18 @@
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
   }
 
-  function browserLocalDate() {
-    const now = new Date();
-    return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+  function normalizeFireDate(value) {
+    const source = String(value ?? '').trim();
+    if (!source) return '';
+    const match = source.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return '';
+    const [, yearText, monthText, dayText] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const check = new Date(Date.UTC(year, month - 1, day));
+    if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return '';
+    return `${dayText}/${monthText}/${yearText}`;
   }
 
   function planError(message, code) {
@@ -184,23 +193,26 @@
     return event;
   }
 
-  function missingHistoryPlanAndFire(normalizedHints, manualPlanId, manualFireTime, fallbackDate) {
+  function missingHistoryPlanAndFire(normalizedHints, manualPlanId, manualFireTime, manualFireDate) {
     const hintValues = [...normalizedHints];
     if (!manualPlanId && hintValues.length > 1) {
       throw planError(`Sem HISTO, informe manualmente o ID do plano quando os anexos apresentarem IDs diferentes (${hintValues.join(', ')}).`, 'MULTIPLE_PLAN_HINTS');
     }
     const planId = manualPlanId || hintValues[0] || '';
     if (!planId) throw planError('Informe o ID numérico do plano ou envie um anexo com o ID do plano antes de forçar a execução.', 'MISSING_PLAN_ID');
+    if (!manualFireDate) {
+      throw planError('O Historial da DRB não foi anexado. Informe a data local do desmonte no site para forçar a execução.', 'MISSING_FIRE_DATE');
+    }
     if (!manualFireTime) {
       throw planError('O Historial da DRB não foi anexado. Informe o horário local do desmonte no site para forçar a execução.', 'MISSING_FIRE_TIME');
     }
     return {
       planId,
-      date: formatDate(normalizeDatePart(fallbackDate) || browserLocalDate()),
+      date: manualFireDate,
       time: manualFireTime,
       forced: true,
       timeSource: 'manual',
-      dateSource: 'browser',
+      dateSource: 'manual',
       historySource: 'missing'
     };
   }
@@ -234,7 +246,7 @@
     return event;
   }
 
-  function resolvePlanAndFire(text, hints, options = {}) {
+  function resolvePlanAndFireFromHistory(text, hints, options = {}) {
     const manualPlanId = parseManualPlanId(options.manualPlanId || options.manualIdentity);
     const rawManualFireTime = options.manualFireTime || options.fireTime || '';
     if (rawManualFireTime && !normalizeFireTime(rawManualFireTime)) {
@@ -250,7 +262,7 @@
     }
     const source = String(text ?? '');
     if (!source.trim() && options.force && options.allowMissingHistory) {
-      return missingHistoryPlanAndFire(normalizedHints, manualPlanId, manualFireTime, options.fallbackDate);
+      return missingHistoryPlanAndFire(normalizedHints, manualPlanId, manualFireTime, options.manualFireDate);
     }
     const events = parseHistoryEvents(source);
     const blocks = historyBlocks(source, events);
@@ -303,11 +315,26 @@
     return extractPlanAndFire(source);
   }
 
+  function resolvePlanAndFire(text, hints, options = {}) {
+    const rawManualFireDate = options.manualFireDate || '';
+    const manualFireDate = normalizeFireDate(rawManualFireDate);
+    if (rawManualFireDate && !manualFireDate) {
+      throw planError('A data informada é inválida. Selecione uma data válida para o desmonte.', 'INVALID_FIRE_DATE');
+    }
+    const event = resolvePlanAndFireFromHistory(text, hints, { ...options, manualFireDate });
+    if (manualFireDate) {
+      event.date = manualFireDate;
+      event.dateSource = 'manual';
+    }
+    return event;
+  }
+
   window.OpenBlastPlanId = {
     extractPlanIds,
     normalizePlanId,
     parsePlanId,
     parseManualPlanId,
+    normalizeFireDate,
     normalizeFireTime,
     parseHistoryEvents,
     planIdsMatch,

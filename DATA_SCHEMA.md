@@ -38,7 +38,7 @@ Campos principais:
 
 Regra de cardinalidade:
 - `Config Final` é a fonte autoritativa dos IDs realizados. Com `business.include_eliminated: true` (padrão), registros presentes no `Config Final` são exportados mesmo quando o `Projeto Completo` informa `eliminated == 1`.
-- Quando `business.include_eliminated: false`, os registros eliminados podem ser excluídos de forma explícita; o resumo e o log registram a quantidade excluída.
+- Quando `business.include_eliminated: false`, os registros eliminados podem ser excluídos de forma explícita; o log registra a quantidade excluída.
 - Com a inclusão habilitada, `Furos no Config Final` deve ser igual a `Furos exportados`.
 
 ## Simulação de teste
@@ -68,12 +68,15 @@ Campos/eventos usados:
 - `[StartProcedure]YYYY/MM/DD-HH:MM:SS` abre o bloco do novo padrão; linhas `BP: PP<plano>` identificam o plano e o primeiro `[Fire]` do bloco define a hora do desmonte.
 - Cabeçalhos com espaço depois de `]` e registros `BMO:`/`DELAYS:` são aceitos. Quando necessário, o offset selecionado (`-03:00`, por exemplo) é aplicado à data/hora antes da saída.
 - Numeros encontrados em listas de detonadores, testes ou falhas nao sao IDs de plano.
-- Sem HISTO, a execução forçada exige `manualFireTime`, usa a data local do navegador e registra `historySource: missing` e `dateSource: browser`; o horário informado pelo usuário é local e não recebe conversão de fuso.
+- O campo online `manualFireDate` aceita uma data ISO (`AAAA-MM-DD`). Se informado, ele define a data local do evento; sem HISTO, a execução forçada exige essa data e `manualFireTime`, registra `historySource: missing` e `dateSource: manual`, e não consulta a data do computador. A data e o horário informados são locais e não recebem conversão de fuso.
+- Com HISTO, a data do primeiro `[Fire]` do bloco compatível continua sendo usada quando o campo de data fica vazio. Uma data digitada explicitamente prevalece sobre a data lida do HISTO e é mantida como data local.
 
 ## Saída Excel
 Abas:
 - `Dados dos Furos`
 - `Resumo`
+
+A aba `Resumo` contém somente três colunas e uma linha de dados: `Plano`, `Data` e `Hora`.
 
 Colunas principais em `Dados dos Furos`:
 - `Data`, `Horario`, `Plano`, `Tipo`, `id`, `y`, `x`, `Z (crest)`, `Z (toe)`, `profundidade prevista`, `profundidade realizada`, `azimute`, `inclinacao`, `cargas previstas`, `cargas realizadas`, `tampao previsto`, `tampao realizado`, `subfuracao`, `diametro`, `tempo detonacao (ms)`
@@ -81,4 +84,4 @@ Colunas principais em `Dados dos Furos`:
 ## Metadados de identificação
 IDs de plano podem aparecer como `PP370626`, `PP0370626` ou com separadores. A composição é `PLANO;MÊS;ANO`: os quatro últimos dígitos são mês e ano, e o trecho anterior é o plano. Para comparação, o prefixo e os separadores são removidos, zeros à esquerda do plano são ignorados, o ano deve ser igual e o mês é ignorado para permitir detonação em mês posterior ou anterior ao mês de emissão. A forma encontrada no HISTO é mantida como o ID do evento na saída. Se houver múltiplos blocos compatíveis, o mês coincidente tem prioridade; sem desempate único, a validação falha por ambiguidade.
 
-O novo padrão também aceita marcadores `BP:440826` e `BP: PP440826`. No modo online, `Identificação informada`, `Modo de execução`, `Fonte da data`, `Historial da DRB` e, quando aplicável, `ID identificado no HISTO` são gravados na aba `Resumo`; a execução forçada não desativa as validações de estrutura ou temporização.
+O novo padrão também aceita marcadores `BP:440826` e `BP: PP440826`. No modo online, os metadados de identificação, execução e fontes do evento permanecem visíveis no resultado da página; a aba `Resumo` contém apenas `Plano`, `Data` e `Hora`. A execução forçada não desativa as validações de estrutura ou temporização.

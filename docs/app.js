@@ -21,6 +21,8 @@ const chargeMinimumHoleError = document.querySelector('#charge-minimum-hole-erro
 const chargeMinimumSuggestion = document.querySelector('#charge-minimum-suggestion');
 const timezoneOffset = document.querySelector('#timezone-offset');
 const planIdentityInput = document.querySelector('#plan-identity');
+const manualFireDateInput = document.querySelector('#manual-fire-date');
+const manualFireDateError = document.querySelector('#manual-fire-date-error');
 const manualFireTimeInput = document.querySelector('#manual-fire-time');
 const manualFireTimeError = document.querySelector('#manual-fire-time-error');
 const forceButton = document.querySelector('#force-submit');
@@ -117,9 +119,10 @@ function makeClientLog(error, options = {}) {
   const files = attachedFiles.map(file => file.name).join('\n') || '-';
   const offset = timezoneOffset?.value || 'none';
   const identity = options.planIdentity?.raw || '-';
+  const fireDate = options.manualFireDate || '-';
   const fireTime = options.manualFireTime || '-';
   const history = options.histoMissing ? 'não anexado' : 'anexado ou não identificado';
-  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nHorário local informado: ${fireTime}\nHistorial da DRB: ${history}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nData local informada: ${fireDate}\nHorário local informado: ${fireTime}\nHistorial da DRB: ${history}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
 function setProgress(value, label) {
@@ -313,6 +316,25 @@ function setManualFireTimeError(message = '') {
   manualFireTimeError.textContent = message;
   manualFireTimeError.hidden = !message;
   manualFireTimeInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function setManualFireDateError(message = '') {
+  if (!manualFireDateError || !manualFireDateInput) return;
+  manualFireDateError.textContent = message;
+  manualFireDateError.hidden = !message;
+  manualFireDateInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function readManualFireDate() {
+  const raw = manualFireDateInput?.value.trim() || '';
+  if (raw && !window.OpenBlastPlanId.normalizeFireDate(raw)) {
+    setManualFireDateError('Selecione uma data válida para o desmonte.');
+    const error = new Error('A data informada é inválida. Selecione uma data válida para o desmonte.');
+    error.code = 'INVALID_FIRE_DATE';
+    throw error;
+  }
+  setManualFireDateError();
+  return raw;
 }
 
 function readManualFireTime() {
@@ -556,30 +578,14 @@ function summarizeChargeDistribution(data, chargeOptions = {}, chargeMetadata = 
   };
 }
 
-function buildWorkbook(data, sources, event, chargeOptions = {}, chargeSummary = null) {
+function buildWorkbook(data, event) {
   const sheet = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLUMNS });
   sheet['!cols'] = [14, 12, 12, 12, 10, 12, 12, 12, 12, 18, 18, 12, 12, 16, 16, 16, 16, 12, 12, 18].map(width => ({ wch: width }));
-  const summaryRows = [
-    ['Campo', 'Valor'], ['Plano', event.planId], ['Data', event.date], ['Hora', event.time],
-    ['Fuso horário', event.timezoneOffset || (event.timeSource ? 'Não convertido — horário local informado' : 'Horário original do HISTO')],
-    ['Fonte da data', event.dateSource === 'browser' ? 'Data local do navegador no momento da execução' : 'HISTO'],
-    ['Historial da DRB', event.historySource === 'missing' ? 'Não anexado — execução forçada' : 'Anexado'],
-    ['Fonte do horário', event.timeSource === 'force-default' ? 'Fallback da execução forçada — 12:00:00' : event.timeSource === 'manual' ? 'Horário informado pelo usuário' : 'HISTO'],
-    ['Modo de execução', event.forced ? 'Forçada' : 'Validação automática'],
-    ['Furos no Config Final', sources.finalRows.length],
-    ['Furos exportados', data.length]
-  ];
-  if (event.planIdentity) summaryRows.push(['Identificação informada', event.planIdentity]);
-  if (event.histoPlanId) summaryRows.push(['ID identificado no HISTO', event.histoPlanId]);
-  if (chargeOptions.enabled) {
-    summaryRows.push(['Carga-alvo aplicado (kg)', chargeOptions.target]);
-    summaryRows.push(['Carga mínima aplicada (kg)', chargeSummary?.minimum]);
-    summaryRows.push(['ID do furo de menor carga', chargeSummary?.minimumHoleId ?? chargeOptions.minimumHoleId]);
-    summaryRows.push(['Carga máxima preservada (kg)', chargeSummary?.maximum]);
-    summaryRows.push(['ID do furo de maior carga', chargeSummary?.maximumHoleId]);
-  }
-  const summary = XLSX.utils.aoa_to_sheet(summaryRows);
-  summary['!cols'] = [{ wch: 28 }, { wch: 42 }];
+  const summary = XLSX.utils.aoa_to_sheet([
+    ['Plano', 'Data', 'Hora'],
+    [event.planId, event.date, event.time]
+  ]);
+  summary['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 12 }];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Dados dos Furos');
   XLSX.utils.book_append_sheet(workbook, summary, 'Resumo');
@@ -601,7 +607,14 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   requireColumns(projectRows, REQUIRED_PROJECT, sources.project.name);
   requireColumns(finalRows, REQUIRED_FINAL, sources.final.name);
   const planIdentity = planOptions.planIdentity || {};
+  const manualFireDate = planOptions.manualFireDate || '';
   const manualFireTime = planOptions.manualFireTime || '';
+  if (sources.histoMissing && force && !manualFireDate) {
+    const error = new Error('O Historial da DRB não foi anexado. Informe a data local do desmonte no site para forçar a execução.');
+    error.code = 'MISSING_FIRE_DATE';
+    error.histoMissing = true;
+    throw error;
+  }
   if (sources.histoMissing && force && !manualFireTime) {
     const error = new Error('O Historial da DRB não foi anexado. Informe o horário local do desmonte no site para forçar a execução.');
     error.code = 'MISSING_FIRE_TIME';
@@ -611,6 +624,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   const resolvedEvent = resolvePlanAndFire(histoText, planHints, {
     force,
     manualPlanId: planIdentity.manualPlanId,
+    manualFireDate,
     manualFireTime,
     allowMissingHistory: sources.histoMissing && force
   });
@@ -622,6 +636,10 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
     forced: force,
     planIdentity: planIdentity.raw || ''
   }, eventTimezoneOffset);
+  if (manualFireDate) {
+    event.date = window.OpenBlastPlanId.normalizeFireDate(manualFireDate);
+    event.dateSource = 'manual';
+  }
   setProgress(62, 'Montando os dados dos furos...');
   const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions);
   const data = builtRows.data;
@@ -634,7 +652,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
     throw new Error(`A quantidade de furos exportados (${data.length}) divergiu do Config Final (${finalRows.length}).`);
   }
   return {
-    workbook: buildWorkbook(data, sources, event, chargeOptions, chargeSummary), event, rows: data.length,
+    workbook: buildWorkbook(data, event), event, rows: data.length,
     totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0),
     sourceFinalRows: builtRows.sourceFinalRows,
     excludedRows: builtRows.excludedRows,
@@ -662,6 +680,7 @@ async function runGeneration(force = false) {
   const generationOptions = { force, planIdentity };
   button.disabled = true; if (forceButton) forceButton.disabled = true; result.hidden = true; statusBox.classList.add('busy'); statusText.textContent = 'Processando localmente...'; setProgress(4, 'Iniciando validação...');
   try {
+    generationOptions.manualFireDate = readManualFireDate();
     generationOptions.manualFireTime = readManualFireTime();
     await refreshChargeMinimumSuggestion();
     const chargeOptions = readChargeTarget();
@@ -683,7 +702,7 @@ async function runGeneration(force = false) {
     if (generated.event.forced) {
       const forceNote = document.createElement('p');
       forceNote.textContent = generated.event.historySource === 'missing'
-        ? `O Historial da DRB não foi anexado. A execução forçada usou o horário local ${generated.event.time}; a data ${generated.event.date} veio do navegador. As validações de estrutura, furos e temporização foram mantidas.`
+        ? `O Historial da DRB não foi anexado. A execução forçada usou a data ${generated.event.date} e o horário local ${generated.event.time} informados por você. As validações de estrutura, furos e temporização foram mantidas.`
         : generated.event.timeSource === 'force-default'
         ? 'O HISTO não apresentou um horário [Fire] legível. A execução forçada usou 12:00:00 como horário local sintético; as validações de estrutura, furos e temporização foram mantidas.'
         : generated.event.timeSource === 'manual'
@@ -701,7 +720,7 @@ async function runGeneration(force = false) {
     const metrics = document.createElement('div'); metrics.className = 'metrics';
     const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Furos no Config Final', generated.sourceFinalRows.toLocaleString('pt-BR')], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${formatKg(generated.totalCharge)} kg`]];
     metricsData.push(['Fuso horário', generated.event.timezoneOffset || (generated.event.timeSource ? 'Horário local informado' : 'Original')]);
-    metricsData.push(['Fonte da data', generated.event.dateSource === 'browser' ? 'Data local do navegador' : 'HISTO']);
+    metricsData.push(['Fonte da data', generated.event.dateSource === 'manual' ? 'Informada pelo usuário' : 'HISTO']);
     metricsData.push(['Historial da DRB', generated.event.historySource === 'missing' ? 'Não anexado (forçada)' : 'Anexado']);
     metricsData.push(['Fonte do horário', generated.event.timeSource === 'force-default' ? 'Fallback forçado (12:00:00)' : generated.event.timeSource === 'manual' ? 'Informado pelo usuário' : 'HISTO']);
     metricsData.push(['Execução', generated.event.forced ? 'Forçada' : 'Automática']);
@@ -729,17 +748,27 @@ async function runGeneration(force = false) {
       const hint = document.createElement('p');
       hint.className = 'force-hint';
       hint.textContent = missingHistory
-        ? 'O botão “Forçar execução” aceita a ausência do histórico, mas precisa do horário informado acima; a data será a data local do navegador.'
+        ? 'O botão “Forçar execução” aceita a ausência do histórico, mas precisa da data e do horário informados acima.'
         : 'Preencha o horário acima. Se usar “Forçar execução” sem preencher, o sistema usará 12:00:00 automaticamente.';
       result.append(hint);
       manualFireTimeInput?.focus();
+    } else if (error.code === 'MISSING_FIRE_DATE') {
+      setManualFireDateError('Informe a data local do desmonte. Sem HISTO, ela é obrigatória.');
+      const hint = document.createElement('p');
+      hint.className = 'force-hint';
+      hint.textContent = 'A data gravada no Excel deve ser a data em que o desmonte aconteceu.';
+      result.append(hint);
+      manualFireDateInput?.focus();
+    } else if (error.code === 'INVALID_FIRE_DATE') {
+      setManualFireDateError(error.message);
+      manualFireDateInput?.focus();
     } else if (!force && /não foi encontrado no HISTO|múltiplos blocos|IDs diferentes/i.test(error.message || '')) {
       const hint = document.createElement('p');
       hint.className = 'force-hint';
       hint.textContent = 'Se a divergência for apenas o mês do ID, informe o plano acima e use o botão “Forçar execução”.';
       result.append(hint);
     }
-    addLogDownload(result, makeClientLog(error, { force, planIdentity, manualFireTime: manualFireTimeInput?.value.trim() || '', histoMissing: error.histoMissing ?? generationOptions.histoMissing })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
+    addLogDownload(result, makeClientLog(error, { force, planIdentity, manualFireDate: manualFireDateInput?.value.trim() || '', manualFireTime: manualFireTimeInput?.value.trim() || '', histoMissing: error.histoMissing ?? generationOptions.histoMissing })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
   } finally { result.hidden = false; button.disabled = false; syncActionControls(); statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 
@@ -751,10 +780,14 @@ form.addEventListener('submit', event => {
 forceButton?.addEventListener('click', () => {
   if (!attachedFiles.length) return;
   const identity = planIdentityInput?.value.trim() || 'identificação automática pelos anexos';
+  const rawDate = manualFireDateInput?.value.trim() || '';
   const rawTime = manualFireTimeInput?.value.trim() || '';
+  const dateNote = rawDate
+    ? `Será usada a data local informada: ${window.OpenBlastPlanId.normalizeFireDate(rawDate) || rawDate}.`
+    : 'Sem o Historial da DRB, informe a data local do desmonte acima.';
   const timeNote = rawTime
     ? `Será usado o horário local informado: ${window.OpenBlastPlanId.normalizeFireTime(rawTime) || rawTime}.`
     : 'Sem o Historial da DRB, informe o horário local acima; com HISTO sem horário legível, será usado 12:00:00 local.';
-  const confirmed = window.confirm(`Forçar execução usando ${identity}?\n\n${timeNote}\n\nSem o Historial da DRB, a data será a data local do navegador. As validações de tabelas, PDF, furos e temporização continuam ativas.`);
+  const confirmed = window.confirm(`Forçar execução usando ${identity}?\n\n${dateNote}\n${timeNote}\n\nAs validações de tabelas, PDF, furos e temporização continuam ativas.`);
   if (confirmed) runGeneration(true);
 });

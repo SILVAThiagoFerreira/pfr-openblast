@@ -25,7 +25,8 @@ Lista consolidada dos arquivos de entrada do modulo de plano de fogo realizado d
 
 - O formato antigo `.txt` continua aceito.
 - O formato `*_histo.log` aceita `[StartProcedure]`, `[BlastPlan]`, linhas `BP:` e `[Fire]`. O horário pode vir como data completa ou somente `HH:MM:SS`; nesse último caso, a data é herdada do último cabeçalho datado.
-- Se o horário do `[Fire]` não for legível, a tela solicita o horário local. Sem HISTO, a execução forçada exige o horário informado pelo usuário e usa a data local do navegador; com HISTO sem horário legível, sem preenchimento, é usado `12:00:00` local e o resumo registra o fallback.
+- Se o horário do `[Fire]` não for legível, a tela solicita o horário local. Sem HISTO, a execução forçada exige a data e o horário informados pelo usuário e não usa a data do computador; com HISTO sem horário legível, sem preenchimento, é usado `12:00:00` local.
+- A aba `Resumo` do Excel contém somente as colunas `Plano`, `Data` e `Hora`, com uma linha de valores.
 - O site permite converter somente o horário lido do HISTO para `UTC-03:00` antes de gerar o Excel; horários manuais e o fallback já são locais.
 
 ## Pasta Esperada

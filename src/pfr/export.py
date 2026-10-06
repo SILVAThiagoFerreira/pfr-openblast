@@ -21,6 +21,7 @@ def export_workbook(path: Path, data: pd.DataFrame, summary: pd.DataFrame, cfg: 
     for row in range(2, ws.max_row + 1):
         ws[f"P{row}"].number_format = stemming_format
         ws[f"Q{row}"].number_format = stemming_format
-    wb[summary_sheet].column_dimensions["A"].width = 28
-    wb[summary_sheet].column_dimensions["B"].width = 42
+    wb[summary_sheet].column_dimensions["A"].width = 16
+    wb[summary_sheet].column_dimensions["B"].width = 14
+    wb[summary_sheet].column_dimensions["C"].width = 12
     wb.save(path)

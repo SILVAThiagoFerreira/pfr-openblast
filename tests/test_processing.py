@@ -13,10 +13,28 @@ if str(SRC) not in sys.path:
 
 from pfr.config import load_config, normalize_config  # noqa: E402
 from pfr.export import export_workbook  # noqa: E402
-from pfr.processing import _fill_missing_detonating_time, build_output_frame, extract_blast_datetime, extract_plan_id, merge_frames  # noqa: E402
+from pfr.processing import _fill_missing_detonating_time, build_output_frame, build_summary, extract_blast_datetime, extract_plan_id, merge_frames  # noqa: E402
 
 
 class ProcessingTest(unittest.TestCase):
+    def test_summary_export_contains_only_plan_date_and_hour(self):
+        cfg = normalize_config(load_config(ROOT / "config.yaml"), ROOT)
+        summary = build_summary("440726", "26/09/2026", "12:06:20")
+        self.assertEqual(summary.columns.tolist(), ["Plano", "Data", "Hora"])
+        self.assertEqual(summary.values.tolist(), [["440726", "26/09/2026", "12:06:20"]])
+
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp) / "resumo.xlsx"
+            data = pd.DataFrame({"Plano": ["440726"]})
+            export_workbook(output, data, summary, cfg)
+            ws = load_workbook(output)[cfg["business"]["summary_sheet_name"]]
+            self.assertEqual(ws.max_row, 2)
+            self.assertEqual(ws.max_column, 3)
+            self.assertEqual(list(ws.values), [
+                ("Plano", "Data", "Hora"),
+                ("440726", "26/09/2026", "12:06:20"),
+            ])
+
     def test_config_final_rows_are_kept_when_project_marks_them_eliminated(self):
         project = pd.DataFrame({"Number": [1, 2, 3], "eliminated": [0, 1, 0]})
         final = pd.DataFrame({"Number": [1, 2, 3]})
@@ -371,7 +389,7 @@ DBD0233;97
         self.assertEqual(data["tampao realizado"].tolist(), [3.0])
         with TemporaryDirectory() as tmp:
             output = Path(tmp) / "saida.xlsx"
-            summary = pd.DataFrame([["Plano", "1234567"]], columns=["Campo", "Valor"])
+            summary = build_summary("1234567", "30/04/2026", "06:04:41")
             export_workbook(output, data, summary, cfg)
             wb = load_workbook(output)
             ws = wb[cfg["business"]["data_sheet_name"]]

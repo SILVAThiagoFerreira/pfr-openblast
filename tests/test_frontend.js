@@ -37,6 +37,9 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /value="-03:00"/);
   assert.match(html, /id="plan-identity"/);
   assert.match(html, /for="plan-identity"[^>]*>ID \/ nome do plano de fogo em trabalho/);
+  assert.match(html, /id="manual-fire-date"[^>]*type="date"/);
+  assert.match(html, /for="manual-fire-date"[^>]*>Data local do desmonte/);
+  assert.match(html, /id="manual-fire-date-error"/);
   assert.match(html, /id="manual-fire-time"/);
   assert.match(html, /for="manual-fire-time"[^>]*>Horário local do desmonte/);
   assert.match(html, /id="manual-fire-time-error"/);
@@ -80,13 +83,15 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /Historial da DRB/);
   assert.equal(fs.existsSync(path.join(root, 'force-execution.css')), true);
   assert.match(app, /parseManualPlanId/);
+  assert.match(app, /manualFireDate/);
   assert.match(app, /manualFireTime/);
   assert.match(app, /12:00:00/);
   assert.match(app, /MISSING_FIRE_TIME/);
   assert.match(app, /allowMissingHistory/);
   assert.match(app, /historySource === 'missing'/);
-  assert.match(app, /dateSource === 'browser'/);
-  assert.match(app, /data local do navegador/);
+  assert.match(app, /MISSING_FIRE_DATE/);
+  assert.match(app, /\['Plano', 'Data', 'Hora'\]/);
+  assert.doesNotMatch(app, /dateSource === 'browser'/);
   assert.match(app, /runGeneration\(true\)/);
   assert.match(app, /Anexe os arquivos do plano para continuar/);
   assert.match(app, /maximumIndexes/);
@@ -97,7 +102,7 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /Furos no Config Final/);
 }
 
-for (const file of ['index.html', 'app.js', 'config.js', 'plan-id.js', 'force-execution.css', 'styles.css', 'charge.js']) {
+for (const file of ['index.html', 'app.js', 'config.js', 'plan-id.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js']) {
   assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 

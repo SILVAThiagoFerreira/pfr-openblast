@@ -92,12 +92,7 @@ def run(
         logger.info("Variação de tampao aplicada em %s furos", merged.attrs["stemming_variation_count"])
     if merged.attrs.get("charge_total_adjusted", False):
         logger.info("Carga total ajustada para %s kg preservando os extremos", cfg["business"].get("charge_total_target_kg"))
-    summary = build_summary(merged, data, plan_id, blast_date, blast_time, {
-        "project": sources.project,
-        "final": sources.final,
-        "plan_pdf": sources.plan_pdf,
-        "timezone_offset": str(timezone_offset_hours) if timezone_offset_hours not in (None, 0, 0.0, "", "0", "+0", "-0") else "horário original do HISTO",
-    })
+    summary = build_summary(plan_id, blast_date, blast_time)
 
     output_name = cfg["business"]["output_name_template"].format(plan_id=plan_id)
     output_path = cfg["paths"]["output_root"] / output_name

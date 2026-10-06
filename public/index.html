@@ -90,7 +90,7 @@
             <span class="step-label">Etapa 2</span>
             <h2 id="options-title">Identificação e horário</h2>
           </div>
-          <span class="workspace__hint">A identificação é opcional; informe o horário se o HISTO não trouxer um.</span>
+          <span class="workspace__hint">A identificação é opcional. Sem HISTO, informe a data e o horário do desmonte.</span>
         </div>
 
         <div class="field-grid">
@@ -102,7 +102,11 @@
           </fieldset>
 
           <fieldset class="fire-time-settings">
-            <legend>Horário</legend>
+            <legend>Data e horário</legend>
+            <label for="manual-fire-date">Data local do desmonte <span class="label-note">(obrigatória sem HISTO)</span></label>
+            <input id="manual-fire-date" name="manualFireDate" type="date" autocomplete="off" aria-describedby="manual-fire-date-help manual-fire-date-error">
+            <p id="manual-fire-date-help" class="field-help">Sem HISTO, informe a data em que o desmonte aconteceu. Com HISTO, deixe em branco para usar a data do evento.</p>
+            <p id="manual-fire-date-error" class="field-error" role="alert" hidden></p>
             <label for="manual-fire-time">Horário local do desmonte <span class="label-note">(obrigatório sem o Historial da DRB)</span></label>
             <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
             <p id="manual-fire-time-help" class="field-help">Usado quando o HISTO não for anexado ou não trouxer um <code>[Fire]</code> legível.</p>
@@ -169,7 +173,7 @@
       <div class="generation-actions">
         <button id="submit" type="submit">Validar e gerar Excel <span aria-hidden="true">→</span></button>
         <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span aria-hidden="true">→</span></button>
-        <p id="force-help" class="field-help force-help">Use só quando o contexto explicar a divergência. Sem o Historial da DRB, informe o horário acima.</p>
+        <p id="force-help" class="field-help force-help">Use só quando o contexto explicar a divergência. Sem o Historial da DRB, informe a data e o horário acima.</p>
       </div>
 
       <div id="progress" class="progress" hidden aria-live="polite">
@@ -205,10 +209,10 @@
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
   <script src="./config.js?v=20260921-config-final"></script>
-  <script src="./plan-id.js?v=20260911-force-no-histo"></script>
+  <script src="./plan-id.js?v=20261006-manual-fire-date"></script>
   <script src="./timing.js?v=20260720-carga-alvo"></script>
   <script src="./charge.js?v=20260917-charge-minimum"></script>
   <script src="./timezone.js?v=20260812"></script>
-  <script src="./app.js?v=20260921-config-final"></script>
+  <script src="./app.js?v=20261006-manual-fire-date-summary"></script>
 </body>
 </html>
