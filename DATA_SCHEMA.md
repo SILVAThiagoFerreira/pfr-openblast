@@ -96,7 +96,7 @@ Amostras observadas (7 arquivos de relatório, com um bloco `DATA` cada):
 
 Disparo usado pela interface (`brex.js`): `{ bmoSerial, displayName, planIds, eventNumber, detonators, date (AAAA-MM-DD, do BMO), time (HH:MM:SS, do BMO), fileName }`.
 
-Rótulo do disparo escolhido: plano do evento; sem plano, o ID digitado no campo de identificação; sem ele, o nome do BMO, o evento ou a série do BMO. O horário preenchido em `Horário local do desmonte` é HH:MM (sem segundos).
+Rótulo do disparo escolhido: plano do evento; sem plano, o ID digitado no campo de identificação; sem ele, o nome do BMO, o evento ou a série do BMO. O horário preenchido em `Horário local do desmonte` é HH:MM:SS, com os segundos do BMO.
 
 ## Saída Excel
 Abas:

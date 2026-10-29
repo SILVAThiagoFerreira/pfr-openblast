@@ -29,11 +29,11 @@ assert.equal(brex.parseBrex('﻿' + fixture, 'bom.brex').detonations[0].time, '1
 const local = brex.adjustDetonation(shot, -3);
 assert.deepEqual(
   { date: local.date, time: local.time, dateIso: local.dateIso },
-  { date: '27/10/2026', time: '12:00', dateIso: '2026-10-27' }
+  { date: '27/10/2026', time: '12:00:56', dateIso: '2026-10-27' }
 );
-assert.equal(brex.adjustDetonation(shot, 0).time, '15:00');
+assert.equal(brex.adjustDetonation(shot, 0).time, '15:00:56');
 assert.equal(brex.adjustDetonation(shot, 12).date, '28/10/2026');
-assert.equal(brex.adjustDetonation(shot, 12).time, '03:00');
+assert.equal(brex.adjustDetonation(shot, 12).time, '03:00:56');
 
 // Sem correspondência com o ID digitado: o rótulo do evento é o ID digitado.
 const unmatched = brex.rankDetonations(parsed.detonations, { query: 'CRISTA F3', fireDateIso: '2026-10-27', offsetHours: -3 });
@@ -80,7 +80,7 @@ const exact = brex.rankDetonations(mixed.detonations, { query: 'pp 440626', fire
 assert.equal(exact[0].detonation.bmoSerial, '344');
 assert.equal(exact[0].score, 100);
 assert.deepEqual(plain(ranked.map(entry => entry.sameDate)), [true, false, true, true]);
-assert.deepEqual(plain(ranked.map(entry => entry.adjusted.time)), ['12:00', '12:10', '08:00', '11:00']);
+assert.deepEqual(plain(ranked.map(entry => entry.adjusted.time)), ['12:00:00', '12:10:00', '08:00:00', '11:00:00']);
 assert.equal(brex.eventLabel(mixed.detonations[0], 'PP440726'), 'Plano 440826');
 assert.equal(brex.eventLabel(mixed.detonations[2], 'CRISTA F3'), 'Plano 590926');
 assert.equal(brex.eventLabel(mixed.detonations[3], 'CRISTA F3'), 'CRISTA F3');

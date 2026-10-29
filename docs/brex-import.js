@@ -1,6 +1,6 @@
 (() => {
   // Interface do botão "Importar BREX (BMO)": escolhe o arquivo, lista os disparos
-  // com o ajuste de horário aplicado ao vivo e preenche o horário de desmonte (HH:MM).
+  // com o ajuste de horário aplicado ao vivo e preenche o horário de desmonte (HH:MM:SS).
   // Toda a leitura acontece no navegador; o arquivo não é enviado a servidor.
   const importButton = document.querySelector('#brex-import-button');
   const fileInput = document.querySelector('#brex-file');
@@ -150,7 +150,7 @@
     }
     statusLine.textContent = typedId
       ? 'Nenhum disparo combina com o ID informado; a lista segue a data informada e a ordem cronológica. Clique em um disparo para preencher o horário.'
-      : 'Clique em um disparo para preencher o horário de desmonte (HH:MM).';
+      : 'Clique em um disparo para preencher o horário de desmonte (HH:MM:SS).';
   }
 
   function render() {

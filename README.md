@@ -73,7 +73,7 @@ Na tela de identificação e horário, o botão **Importar BREX (BMO)** abre a e
 
 - O relógio do BMO grava em UTC. O campo **Ajuste do horário do BMO (horas)** converte os horários listados; o padrão é `-3` (Brasília). O valor é aplicado ao vivo a todos os disparos.
 - A lista mostra data, horário ajustado e identificadores (plano, nome do BMO, evento, série do BMO e nome do arquivo). Disparos que combinam com o ID informado aparecem primeiro e destacados.
-- Ao clicar em um disparo, o campo **Horário local do desmonte** recebe o horário em HH:MM. A data e o ID não mudam; segundos não são preenchidos.
+- Ao clicar em um disparo, o campo **Horário local do desmonte** recebe o horário em HH:MM:SS. A data e o ID não mudam.
 - Sem ID de plano no evento, o rótulo do disparo escolhido é o ID digitado no campo de identificação.
 - Em caso de arquivo inválido, a importação é recusada com a mensagem do erro; nenhum horário é inventado.
 

@@ -213,8 +213,7 @@
     return {
       dateIso: `${yyyy}-${mm}-${dd}`,
       date: `${dd}/${mm}/${yyyy}`,
-      time: `${hh}:${min}`,
-      timeFull: `${hh}:${min}:${ss}`,
+      time: `${hh}:${min}:${ss}`,
       sortKey: shifted.getTime()
     };
   }
