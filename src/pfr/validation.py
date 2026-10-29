@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .io import read_table
+from .io import read_design_table, read_table
 from .models import SourceFiles
 
 
@@ -23,6 +23,9 @@ def validate_sources(sources: SourceFiles, cfg: dict) -> None:
         errors.extend(validate_columns(read_table(sources.project), validation["required_project_columns"], sources.project.name))
     if sources.final.exists():
         errors.extend(validate_columns(read_table(sources.final), validation["required_final_columns"], sources.final.name))
+    if sources.design is not None and sources.design.exists():
+        design = read_design_table(sources.design, cfg["business"]["elevation_design_sheet_pattern"])
+        errors.extend(validate_columns(design, validation["required_design_columns"], sources.design.name))
 
     if errors:
         raise ValueError("\n".join(errors))

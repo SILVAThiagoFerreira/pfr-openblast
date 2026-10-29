@@ -8,6 +8,8 @@ class SourceFiles:
     final: Path
     plan_pdf: Path | None
     histo_files: tuple[Path, ...]
+    # Plano de Perfuração (planilha): fonte da cota (Z Collar) quando o Config Final não traz cota válida.
+    design: Path | None = None
 
 
 @dataclass(frozen=True)

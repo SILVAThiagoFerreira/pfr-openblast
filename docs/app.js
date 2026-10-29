@@ -36,6 +36,8 @@ let applyingChargeSuggestion = false;
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
 const REQUIRED_FINAL = ['Number', 'X', 'Y', 'Z', 'X_Toe', 'Y_Toe', 'Z_Toe', 'Length', 'Stemming', 'Diameter', 'Subdrilling', 'Angle', 'Azimuth', 'DetonatingTime', 'InputedCharge'];
 const KNOWN_COLUMNS = [...new Set([...REQUIRED_PROJECT, ...REQUIRED_FINAL])];
+// Plano de Perfuração (planilha): fonte da cota (Z Collar) por Number (elevation.js).
+const REQUIRED_DESIGN = ['ID', 'X Collar', 'Y Collar', 'Z Collar'];
 const OUTPUT_COLUMNS = ['Data', 'Horario', 'Plano', 'Tipo', 'id', 'y', 'x', 'Z (crest)', 'Z (toe)', 'profundidade prevista', 'profundidade realizada', 'azimute', 'inclinacao', 'cargas previstas', 'cargas realizadas', 'tampao previsto', 'tampao realizado', 'subfuracao', 'diametro', 'tempo detonacao (ms)'];
 const ALIASES = {
   'UTM X': 'UTM_X', 'UTM Y': 'UTM_Y', 'Length (m)': 'Length_m', 'Stemming (m)': 'Stemming_m',
@@ -401,6 +403,20 @@ async function readTable(file) {
   return (await readTableDetailed(file)).rows;
 }
 
+// Plano de Perfuração (planilha): lê a aba cujo nome contém `elevationDesignSheetPattern`
+// (sem acentos nem caixa), ou a primeira aba. Não entra no cálculo de furos, só na cota.
+async function readDesignTableDetailed(file) {
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+  const { canonicalKey } = window.OpenBlastTableHeaders;
+  const pattern = canonicalKey(BUSINESS.elevationDesignSheetPattern || '');
+  const sheetName = workbook.SheetNames.find(name => pattern && canonicalKey(name).includes(pattern)) || workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  // Só as colunas de cota são reconhecidas; as demais do plano (ex.: "Z Toe") não entram no cálculo.
+  return window.OpenBlastTableHeaders.canonicalizeTable(XLSX.utils.sheet_to_json(sheet, { defval: '' }), {
+    knownColumns: REQUIRED_DESIGN
+  });
+}
+
 function hasColumns(rows, columns) {
   if (!rows.length) return false;
   const available = new Set(rows.flatMap(row => Object.keys(row)));
@@ -451,6 +467,19 @@ async function findSources(files, { allowMissingHistory = false } = {}) {
   const warnings = parsedTables
     .filter(item => item.renamed?.length && usedTables.has(item.file))
     .map(item => `${item.file.name}: cabeçalhos reconhecidos automaticamente (${item.renamed.map(change => `"${change.from}" → "${change.to}"`).join(', ')}).`);
+  // Plano de Perfuração (planilha): identificado pelas colunas ID, X Collar, Y Collar e Z Collar.
+  // Não é anexo obrigatório: sem ele, a cota depende do Config Final (ver elevation.js).
+  const designCandidates = files.filter(file => /\.(?:xlsx|xlsm)$/i.test(file.name) && file !== projectEntry?.file && file !== finalEntry?.file);
+  const designParsed = await Promise.all(designCandidates.map(async file => {
+    try { return { file, ...(await readDesignTableDetailed(file)) }; } catch (error) { return { file, rows: [], renamed: [], error }; }
+  }));
+  const designEntry = designParsed.find(item => hasColumns(item.rows, REQUIRED_DESIGN));
+  designParsed
+    .filter(item => item !== designEntry && /perfura/i.test(item.file.name))
+    .forEach(item => warnings.push(`${item.file.name}: colunas ${REQUIRED_DESIGN.join(', ')} não encontradas; a cota (Z) não foi lida desta planilha.`));
+  if (designEntry?.renamed?.length) {
+    warnings.push(`${designEntry.file.name}: cabeçalhos reconhecidos automaticamente (${designEntry.renamed.map(change => `"${change.from}" → "${change.to}"`).join(', ')}).`);
+  }
   const textFiles = files.filter(file => /\.(?:txt|log)$/i.test(file.name));
   setProgress(30, allowMissingHistory ? 'Lendo as entradas; o histórico pode ser omitido no modo forçado...' : 'Lendo o histórico de disparos...');
   const textCandidates = await Promise.all(textFiles.map(async file => ({ file, text: decodeText(new Uint8Array(await file.arrayBuffer())) })));
@@ -464,7 +493,7 @@ async function findSources(files, { allowMissingHistory = false } = {}) {
   if (!pdf) throw new Error('Envie o PP.pdf.');
   const pdfHeader = decodeText(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
   if (!pdfHeader.startsWith('%PDF-')) throw new Error(`O arquivo ${pdf.name} não parece ser um PDF válido.`);
-  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry?.text || '', histoMissing: !histo, pdf, planHints: sourcePlanHints(files, parsedTables), warnings };
+  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry?.text || '', histoMissing: !histo, pdf, planHints: sourcePlanHints(files, parsedTables), warnings, designRows: designEntry?.rows || [] };
 }
 
 // Nomes usados para derivar o ID do plano, na ordem de preferência: PDF primeiro,
@@ -531,7 +560,7 @@ function findUniqueHoleIndex(rows, holeId) {
   return indexes[0];
 }
 
-function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
+function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows = []) {
   const projects = new Map(projectRows.map(row => [key(row.Number), row]));
   const mergedCandidates = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }));
   const merged = (BUSINESS.includeEliminated
@@ -539,6 +568,20 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
     : mergedCandidates.filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0))
     .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
   const numbers = merged.map(row => parseNumber(row.Number));
+  // Cota (Z): regra em elevation.js. Furo sem cota fica em branco e entra em aviso (sem erro silencioso).
+  const elevation = window.OpenBlastElevation.resolveElevations(
+    merged.map((row, index) => ({
+      number: numbers[index], x: parseNumber(row.X), y: parseNumber(row.Y), z: parseNumber(row.Z),
+      zToe: parseNumber(row.Z_Toe), length: parseNumber(row.Length), angle: parseNumber(row.Angle)
+    })),
+    designRows.map(row => ({
+      number: parseNumber(row.ID), x: parseNumber(row['X Collar']), y: parseNumber(row['Y Collar']), z: parseNumber(row['Z Collar'])
+    })),
+    {
+      minM: BUSINESS.elevationPlausibleMinM, maxM: BUSINESS.elevationPlausibleMaxM,
+      matchToleranceM: BUSINESS.elevationDesignMatchToleranceM
+    }
+  );
   const times = window.OpenBlastTiming.fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
   const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
   const baseCharges = redistributeZeros(rawCharges);
@@ -576,7 +619,9 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
       const diameter = diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw;
       return {
         Data: event.date, Horario: event.time, Plano: event.planId, Tipo: BUSINESS.type, id: numbers[index],
-        y: parseNumber(row.Y), x: parseNumber(row.X), 'Z (crest)': parseNumber(row.Z), 'Z (toe)': parseNumber(row.Z_Toe),
+        y: parseNumber(row.Y), x: parseNumber(row.X),
+        'Z (crest)': elevation.byNumber.get(numbers[index])?.zCrest ?? null,
+        'Z (toe)': elevation.byNumber.get(numbers[index])?.zToe ?? null,
         'profundidade prevista': parseNumber(row.Length_m ?? row.p_length), 'profundidade realizada': parseNumber(row.Length),
         azimute: parseNumber(row.Azimuth), inclinacao: parseNumber(row.Angle), 'cargas previstas': parseNumber(row.Total_Charge_kg),
         'cargas realizadas': charges[index], 'tampao previsto': parseNumber(row.Stemming_m), 'tampao realizado': stemmingValues[index],
@@ -587,7 +632,8 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}) {
       data,
       chargeMetadata,
       sourceFinalRows: finalRows.length,
-      excludedRows: mergedCandidates.length - merged.length
+      excludedRows: mergedCandidates.length - merged.length,
+      elevationWarnings: elevation.warnings
     };
   });
 }
@@ -692,7 +738,8 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   const outputName = window.OpenBlastPlanLabel.outputFileName(event.planId, PLAN_LABEL_CONFIG);
   const warnings = [...(sources.warnings || []), ...identity.warnings, ...outputName.warnings];
   setProgress(62, 'Montando os dados dos furos...');
-  const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions);
+  const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions, sources.designRows);
+  warnings.push(...builtRows.elevationWarnings);
   const data = builtRows.data;
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
   const timing = data.map(row => row['tempo detonacao (ms)']);

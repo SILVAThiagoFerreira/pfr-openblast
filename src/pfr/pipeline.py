@@ -9,8 +9,9 @@ import pandas as pd
 
 from .config import load_config, normalize_config
 from .discovery import discover_sources
+from .elevation import resolve_elevations
 from .export import export_workbook
-from .io import backup_inputs
+from .io import backup_inputs, read_design_table
 from .models import RunResult
 from .processing import build_output_frame, build_summary, extract_blast_datetime, extract_plan_id, load_final_frame, load_project_frame, merge_frames
 from .validation import validate_output, validate_sources
@@ -52,7 +53,7 @@ def run(
 
     sources = discover_sources(cfg)
     validate_sources(sources, cfg)
-    backup_inputs([sources.project, sources.final, sources.plan_pdf, *sources.histo_files], cfg["paths"]["backup_root"])
+    backup_inputs([sources.project, sources.final, sources.plan_pdf, sources.design, *sources.histo_files], cfg["paths"]["backup_root"])
 
     plan_id = extract_plan_id(sources.plan_pdf, sources.histo_files, cfg, sources)
     if timezone_offset_hours is None:
@@ -72,6 +73,10 @@ def run(
     project = load_project_frame(sources.project)
     final = load_final_frame(sources.final)
     merged = merge_frames(project, final, cfg)
+    design = read_design_table(sources.design, cfg["business"]["elevation_design_sheet_pattern"]) if sources.design else None
+    merged, elevation_warnings = resolve_elevations(merged, design, cfg)
+    for message in elevation_warnings:
+        logger.warning("Cota (Z): %s", message)
     data = build_output_frame(merged, plan_id, blast_date, blast_time, cfg)
     if bool(cfg["business"].get("include_eliminated", True)) and len(data) != len(final):
         raise ValueError(

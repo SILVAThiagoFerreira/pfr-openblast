@@ -116,6 +116,12 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /id="inputs"[^>]*accept="[^"]*\.brex"/);
   assert.match(html, /src="\.\/plan-id\.js\?[^"]*"[\s\S]*src="\.\/plan-label\.js\?[^"]*"[\s\S]*src="\.\/table-headers\.js\?[^"]*"[\s\S]*src="\.\/app\.js\?/);
   assert.match(app, /routeBrexFiles/);
+  // Cota (Z): o plano de perfuração é lido por colunas e a regra fica em elevation.js.
+  assert.match(html, /src="\.\/elevation\.js\?[^"]*"[\s\S]*src="\.\/app\.js\?/);
+  assert.match(app, /OpenBlastElevation\.resolveElevations/);
+  assert.match(app, /readDesignTableDetailed/);
+  assert.match(app, /REQUIRED_DESIGN = \['ID', 'X Collar', 'Y Collar', 'Z Collar'\]/);
+  assert.match(app, /elevationWarnings/);
   assert.match(app, /OpenBlastBrexImport\.importFiles/);
   assert.match(app, /OpenBlastPlanLabel\.resolvePlanIdentity/);
   assert.match(app, /OpenBlastPlanLabel\.outputFileName/);
@@ -127,7 +133,7 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.result-warnings/);
 }
 
-for (const file of ['index.html', 'app.js', 'config.js', 'plan-id.js', 'plan-label.js', 'table-headers.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js', 'brex.js', 'brex-import.js', 'brex-import.css']) {
+for (const file of ['index.html', 'app.js', 'config.js', 'elevation.js', 'plan-id.js', 'plan-label.js', 'table-headers.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js', 'brex.js', 'brex-import.js', 'brex-import.css']) {
   assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 

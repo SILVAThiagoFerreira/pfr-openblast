@@ -25,6 +25,11 @@ window.PFR_BROWSER_CONFIG = {
       'config final', 'configuracao final'
     ],
     outputNameTemplate: 'Plano_Fogo_Realizado_PP{plan_id}.xlsx',
-    outputNameTextTemplate: 'Plano_Fogo_Realizado_{plan_label}.xlsx'
+    outputNameTextTemplate: 'Plano_Fogo_Realizado_{plan_label}.xlsx',
+    // Cota (Z) do realizado (espelho de business.elevation_*; tests/test_browser_config.py verifica a igualdade).
+    elevationPlausibleMinM: -500,
+    elevationPlausibleMaxM: 5000,
+    elevationDesignMatchToleranceM: 0.5,
+    elevationDesignSheetPattern: 'PROJETO PERFURA'
   }
 };

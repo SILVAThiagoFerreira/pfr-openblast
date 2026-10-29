@@ -6,7 +6,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 ## Entradas
 - Projeto: `Projeto Completo.csv` (`*PROJETO COMPLETO*`)
 - Realizado: `Config Final.csv` (`*CONFIG FINAL*`), exportado após Atualização dos Furos
-- Plano Excel: `Plano de Perfuração.xlsx`
+- Plano Excel: `Plano de Perfuração.xlsx` (aba `PROJETO PERFURAÇÃO`; colunas `ID`, `X Collar`, `Y Collar`, `Z Collar`; fonte da cota quando o Config Final não traz cota válida, ver "Cota (Z) do realizado")
 - Plano PDF: `Plano de Perfuração.pdf` (`PP*.pdf` ou `PP.pdf`)
 - Histórico da BMO: `.txt` ou novo padrão `*_histo.log`; obrigatório no modo automático e opcional no modo forçado
 - Relatório BREX (BMO) — opcional, somente no site: arquivo `*.brex` (XML `DB_BLASTREPORT_EXCHANGE`) exportado pelo sismógrafo BMO. Serve apenas para preencher o horário de desmonte; não entra no Excel como fonte de dados. Formato em `DATA_SCHEMA.md`, seção "Entrada BREX (BMO)".
@@ -29,8 +29,19 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - No site, o usuário pode habilitar um alvo de carga realizada em kg e deve informar também uma carga mínima positiva por furo e o ID único do furo que receberá esse mínimo. O alvo substitui o alvo configurado apenas para a execução atual. A distribuição percorre todo o plano: fixa o furo identificado exatamente no mínimo informado, ajusta determinísticamente os demais furos intermediários dentro do intervalo mínimo-máximo, preserva exatamente a maior carga original do `InputedCharge` e todos os furos empatados nesse valor, e fecha o total final. O ID mínimo não pode pertencer ao grupo de máximos originais. Sem alvo habilitado, a execução mantém o comportamento padrão.
 - Ao anexar um `Config Final` legível, o site sugere automaticamente a menor carga positiva de `InputedCharge` e o primeiro `Number` correspondente nos campos de carga mínima e ID mínimo. Valores editados pelo usuário não são sobrescritos.
 - `X` e `Y` são preenchidos a partir do arquivo final e, se faltarem, do arquivo de projeto.
-- `Z (crest)` e `Z (toe)` devem refletir a geometria do arquivo final quando disponível.
+- `Z (crest)` e `Z (toe)` são cotas (elevação, em metros) e seguem a seção "Cota (Z) do realizado".
 - O arquivo de saída é nomeado com o ID do plano.
+
+## Cota (Z) do realizado
+Motivo: o `Config Final` exportado em 27/10/2026 (REG CRISTA F3) trazia em `Z` valores com a ordem de grandeza de X (748775,62 no furo 171), e não cota (~287,6 m). O Excel gravou esses valores em `Z (crest)`. A cota real está no Plano de Perfuração (`Z Collar`), e o `Z_Toe` do Config Final segue a mesma convenção (`Z_Toe = Z - Length * cos(Angle)`, verificada em todos os 204 furos desse export).
+
+- Faixa de cota: um valor de `Z` só é cota se estiver entre `business.elevation_plausible_min_m` (-500) e `business.elevation_plausible_max_m` (5000). Valores fora dessa faixa não são usados como cota.
+- `Z (crest)`: usa o `Z` do Config Final quando é cota válida. Senão, usa o `Z Collar` do Plano de Perfuração (planilha, aba cujo nome contém `business.elevation_design_sheet_pattern`, ex.: `PROJETO PERFURAÇÃO`) do mesmo `Number`, desde que o `X`/`Y` do Config Final esteja a até `business.elevation_design_match_tolerance_m` (0,5 m) do `X Collar`/`Y Collar` do plano. Furos sem cota válida ficam com `Z (crest)` e `Z (toe)` em branco e aparecem em aviso com o motivo.
+- `Z (toe)`: usa o `Z_Toe` do Config Final somente quando o `Z (crest)` também veio do Config Final e o valor é cota válida. Senão, é calculado pela geometria realizada: `Z (crest) - profundidade realizada * cos(inclinação)`, com aviso. O `Z Toe` planejado do plano não é usado, porque a profundidade realizada pode diferir da prevista.
+- Sem nenhuma cota válida em todo o plano, a execução é interrompida com erro explícito; não há coluna vazia silenciosa.
+- Avisos (site e log da CLI): Z do Config Final fora da faixa (com exemplos), cota obtida do plano (quantidade), furos sem cota (IDs e motivo), Z (toe) calculado (quantidade).
+- O Plano de Perfuração é identificado pelas colunas `ID`, `X Collar`, `Y Collar` e `Z Collar`. Se a planilha for encontrada e faltarem colunas, a validação para com erro. No site, a leitura de cabeçalhos reconhece variações destas quatro colunas com aviso, como nas demais tabelas.
+- Implementação: `public/elevation.js` (site) e `src/pfr/elevation.py` (CLI); mesma regra e mesmos avisos. Testes: `tests/test_elevation.js` e `tests/test_elevation.py`.
 
 ## Validação
 - Verificar existência dos arquivos obrigatórios.

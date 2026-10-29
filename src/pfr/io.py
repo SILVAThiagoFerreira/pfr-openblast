@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 import shutil
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +31,21 @@ def read_table(path: Path) -> pd.DataFrame:
         df = pd.read_csv(path, skipinitialspace=True)
     df.columns = [str(col).strip() for col in df.columns]
     df = df.rename(columns={col: COLUMN_ALIASES[col] for col in df.columns if col in COLUMN_ALIASES})
+    return df
+
+
+def _sheet_key(name: str) -> str:
+    text = unicodedata.normalize("NFD", str(name)).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def read_design_table(path: Path, sheet_pattern: str) -> pd.DataFrame:
+    """Lê o Plano de Perfuração (planilha): a aba cujo nome contém `sheet_pattern` (sem acentos nem caixa), ou a primeira."""
+    sheets = pd.read_excel(path, sheet_name=None)
+    pattern = _sheet_key(sheet_pattern)
+    name = next((sheet for sheet in sheets if pattern and pattern in _sheet_key(sheet)), next(iter(sheets)))
+    df = sheets[name]
+    df.columns = [str(col).strip() for col in df.columns]
     return df
 
 

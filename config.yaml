@@ -20,6 +20,12 @@ inputs:
     plan_pdf_patterns:
       - "PP*.pdf"
       - "PP.pdf"
+    # Plano de Perfuração em planilha: fonte da cota (Z Collar) quando o Config Final não traz cota.
+    design_patterns:
+      - "*PERFURA*.xlsx"
+      - "*PERFURA*.xlsm"
+      - "PP*.xlsx"
+      - "PP*.xlsm"
     histo_patterns:
       - "HISTO-*.txt"
       - "HISTO-*.log"
@@ -70,8 +76,21 @@ business:
     - "config final"
     - "configuracao final"
   output_name_text_template: "Plano_Fogo_Realizado_{plan_label}.xlsx"
+  # Cota (Z) do realizado. O Z do Config Final é usado somente se estiver nesta faixa (cota, não coordenada X).
+  # Caso contrário, Z (crest) vem do Plano de Perfuração (Z Collar) quando X/Y conferem dentro da tolerância;
+  # Z (toe) vem do Config Final ou é calculado pela geometria realizada. Regras em SPEC.md ("Cota (Z) do realizado").
+  # Espelhado em public/config.js; tests/test_browser_config.py verifica a igualdade.
+  elevation_plausible_min_m: -500
+  elevation_plausible_max_m: 5000
+  elevation_design_match_tolerance_m: 0.5
+  elevation_design_sheet_pattern: "PROJETO PERFURA"
 
 validation:
+  required_design_columns:
+    - "ID"
+    - "X Collar"
+    - "Y Collar"
+    - "Z Collar"
   required_project_columns:
     - "Number"
     - "UTM_X"

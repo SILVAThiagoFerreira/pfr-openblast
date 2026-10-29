@@ -13,6 +13,11 @@ SCALAR_KEYS = {
     "plan_label_max_length": "planLabelMaxLength",
     "output_name_template": "outputNameTemplate",
     "output_name_text_template": "outputNameTextTemplate",
+    # Cota (Z) do realizado: limites da faixa de cota, tolerância X/Y e aba do plano de perfuração.
+    "elevation_plausible_min_m": "elevationPlausibleMinM",
+    "elevation_plausible_max_m": "elevationPlausibleMaxM",
+    "elevation_design_match_tolerance_m": "elevationDesignMatchToleranceM",
+    "elevation_design_sheet_pattern": "elevationDesignSheetPattern",
 }
 LIST_KEYS = {
     "plan_label_generic_names": "planLabelGenericNames",
@@ -23,9 +28,10 @@ def _js_scalar(source: str, js_key: str):
     string_match = re.search(rf"\b{js_key}:\s*'([^']*)'", source)
     if string_match:
         return string_match.group(1)
-    number_match = re.search(rf"\b{js_key}:\s*(-?\d+)\b", source)
+    number_match = re.search(rf"\b{js_key}:\s*(-?\d+(?:\.\d+)?)\b", source)
     assert number_match, f"public/config.js deve definir {js_key}"
-    return int(number_match.group(1))
+    text = number_match.group(1)
+    return float(text) if "." in text else int(text)
 
 
 def _js_list(source: str, js_key: str) -> list[str]:

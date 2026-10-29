@@ -22,10 +22,10 @@ Campos principais:
 - `Number` integer
 - `X` float
 - `Y` float
-- `Z` float
+- `Z` float — cota (elevação, m) do collar. Se o valor estiver fora da faixa `business.elevation_plausible_min_m`..`max_m`, não é cota (pode ser coordenada X, como no export de 27/10/2026): a cota é obtida pela seção "Plano de Perfuração (cota)".
 - `X_Toe` float
 - `Y_Toe` float
-- `Z_Toe` float
+- `Z_Toe` float — cota do fundo; segue `Z_Toe = Z - Length * cos(Angle)` no export verificado.
 - `Length` float
 - `Stemming` float
 - `Diameter` float
@@ -40,6 +40,25 @@ Regra de cardinalidade:
 - `Config Final` é a fonte autoritativa dos IDs realizados. Com `business.include_eliminated: true` (padrão), registros presentes no `Config Final` são exportados mesmo quando o `Projeto Completo` informa `eliminated == 1`.
 - Quando `business.include_eliminated: false`, os registros eliminados podem ser excluídos de forma explícita; o log registra a quantidade excluída.
 - Com a inclusão habilitada, `Furos no Config Final` deve ser igual a `Furos exportados`.
+
+## Plano de Perfuração (cota)
+Arquivo: `Plano de Perfuração.xlsx` (`*PERFURA*.xlsx`, `PP*.xlsx` na CLI; no site, a planilha que tem as colunas abaixo, lida pela aba cujo nome contém `PROJETO PERFURA`). Não é fonte de furos nem de carga: fornece apenas a cota de referência.
+
+Campos usados:
+- `ID` integer — igual ao `Number` do Config Final (ex.: `ID` 171 = `Number` 171, mesmas coordenadas).
+- `X Collar` float, `Y Collar` float — conferidos contra o `X`/`Y` do Config Final dentro de `business.elevation_design_match_tolerance_m`.
+- `Z Collar` float — cota da boca (usada como `Z (crest)`).
+- `Z Toe`, `Depth`, `Dip` — presentes na planilha, não usados pela cota (a profundidade realizada e a inclinação do Config Final definem o `Z (toe)`).
+
+Regras de identificação: `ID` repetido impede a cota desse furo (aviso). Faltando qualquer das quatro colunas, a validação interrompe a execução.
+
+Configuração (`config.yaml`, espelhada em `public/config.js`):
+- `business.elevation_plausible_min_m` (-500) e `business.elevation_plausible_max_m` (5000): faixa de cota aceita.
+- `business.elevation_design_match_tolerance_m` (0.5): tolerância X/Y em metros.
+- `business.elevation_design_sheet_pattern` (`PROJETO PERFURA`): trecho do nome da aba, sem acentos nem caixa.
+- `inputs.pp.design_patterns` (CLI) e `validation.required_design_columns`.
+
+Exemplo validado (REG CRISTA F3, 27/10/2026): furo 171 — `Z Collar` 287,63; `Z (toe)` = 287,63 - 8,4 * cos(15°) = 279,516. Furos 1000, 1001, 1002, 1004 e 1006 do Config Final não existem no plano (Projeto Completo com UTM zerado): ficam sem cota.
 
 ## Simulação de teste
 - `tampao previsto` e `tampao realizado` são exportados com uma casa decimal.

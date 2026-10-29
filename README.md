@@ -14,7 +14,7 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 - `input/*PROJETO COMPLETO*.csv|xlsx` — Projeto Completo.csv (QAQC do O-PitSurface)
 - `input/*CONFIG FINAL*.csv|xlsx` — Config Final.csv, exportado após Atualização dos Furos
 - `input/PP.pdf` — Plano de Perfuração.pdf
-- `input/PP*.xlsx` — Plano de Perfuração.xlsx
+- `input/PP*.xlsx` (ou `*PERFURA*.xlsx`) — Plano de Perfuração.xlsx; fornece a cota `Z Collar` quando o Config Final não traz cota válida (ver "Cota (Z)")
 - `input/HISTO-*.txt|*_histo.log` — histórico da BMO, obrigatório na validação automática e opcional na execução forçada
 - `*.brex` — relatório BREX do BMO; opcional e somente no site, para preencher o horário de desmonte (ver "Importação do BREX (BMO)")
 
@@ -86,6 +86,11 @@ Configuração (`config.yaml`, espelhada em `public/config.js`):
 - `business.brex_offset_min_hours` e `business.brex_offset_max_hours`: limites aceitos (`-12` e `14`).
 
 Formato do arquivo e regras de leitura: `DATA_SCHEMA.md`, seção "Entrada BREX (BMO)".
+
+## Cota (Z)
+O `Z (crest)` e o `Z (toe)` do Excel são cotas (elevação). Quando o `Z` do Config Final não está na faixa de cota configurada (`business.elevation_plausible_min_m`/`max_m`), a cota vem do `Z Collar` do Plano de Perfuração do mesmo `Number`, com X/Y conferidos dentro de `business.elevation_design_match_tolerance_m`. O `Z (toe)` vem do Config Final ou é calculado como `Z (crest) - profundidade realizada * cos(inclinação)`. Furos sem cota ficam em branco e aparecem em aviso com o motivo. Regras em SPEC.md ("Cota (Z) do realizado") e formato em DATA_SCHEMA.md ("Plano de Perfuração (cota)").
+
+Configuração (`config.yaml`, espelhada em `public/config.js`): `business.elevation_plausible_min_m`, `business.elevation_plausible_max_m`, `business.elevation_design_match_tolerance_m`, `business.elevation_design_sheet_pattern`, `inputs.pp.design_patterns` e `validation.required_design_columns`.
 
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.

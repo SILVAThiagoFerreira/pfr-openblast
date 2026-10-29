@@ -31,6 +31,18 @@ Critério objetivo de conclusão:
 - o fluxo executa por um único entrypoint;
 - as etapas de leitura, validação, processamento e exportação estão separadas.
 
+## Atualização: cota (Z) do realizado
+Motivo: o Z de saída do export de 27/10/2026 (REG CRISTA F3) estava na escala de X (748775,62 no furo 171), não em cota (~287,63 m). O Excel de referência exige cota.
+
+Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), configuração (`config.yaml` e `public/config.js`), módulo de cota (`public/elevation.js` e `src/pfr/elevation.py`), leitura e validação do plano de perfuração (`public/app.js`, `src/pfr/io.py`, `src/pfr/validation.py`, `src/pfr/discovery.py`), processamento e testes.
+
+- Z do Config Final só é usado como cota dentro da faixa configurada; caso contrário, Z (crest) vem do Plano de Perfuração (Z Collar) com X/Y conferidos.
+- Z (toe) do Config Final ou calculado pela geometria realizada, com aviso.
+- Furos sem cota ficam em branco com aviso (sem erro silencioso); sem cota em nenhum furo, a execução para com erro.
+- Configuração nova: `business.elevation_*`, `inputs.pp.design_patterns`, `validation.required_design_columns`.
+- Testes: `tests/test_elevation.js`, `tests/test_elevation.py`, `tests/test_frontend.js` (routing e docs/) e `tests/test_browser_config.py` (espelho das chaves).
+- Pendência aberta: cinco furos do Config Final (1000, 1001, 1002, 1004 e 1006) não existem no Plano de Perfuração do cenário; sem cota de referência, ficam sem Z. Decisão do usuário se deve haver cota de outra fonte ou bloqueio.
+
 ## Atualização do modo online
 - Permitir inclusão e remoção incremental de anexos sem reiniciar a seleção.
 - Manter uma área operacional compacta, com tutorial, opções avançadas e modelos recolhíveis, sem remover os controles funcionais nem as orientações essenciais.
