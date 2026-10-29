@@ -5,7 +5,8 @@
   //    Senão, o furo fica sem cota (vazio) e aparece em aviso.
   //  - Z (toe): Z_Toe do Config Final quando o Z (crest) também veio do Config Final e o valor é cota plausível.
   //    Senão, Z (crest) - profundidade realizada * cos(inclinação), com aviso.
-  //  - Nenhum furo com cota: erro explícito (não gera a coluna vazia em silêncio).
+  //  - Nenhum furo com cota: não bloqueia. Z (crest) e Z (toe) ficam em branco e o aviso
+  //    "Nenhum furo com cota; Z em branco" aparece no topo da lista de avisos.
   // config: { minM, maxM, matchToleranceM } (espelho de business.elevation_* em config.yaml).
   // holes: [{ number, x, y, z, zToe, length, angle }] e designRows: [{ number, x, y, z }], valores numéricos ou null.
 
@@ -39,7 +40,7 @@
       } else {
         const plan = design.get(hole.number);
         if (!plan) {
-          reason = 'não consta no plano de perfuração';
+          reason = design.size ? 'não consta no plano de perfuração' : 'Plano de Perfuração não anexado';
         } else if (!Number.isFinite(plan.x) || !Number.isFinite(plan.y) || !Number.isFinite(hole.x) || !Number.isFinite(hole.y)) {
           reason = 'X/Y ausente para conferir com o plano';
         } else {
@@ -74,15 +75,14 @@
     }
 
     const resolved = counts.final + counts.design;
-    if (holes.length && resolved === 0) {
-      throw new Error(
-        `Não há cota (Z) válida para nenhum furo. O Z do Config Final não é cota (faixa de ${config.minM} a ${config.maxM} m) ` +
-        'e o Plano de Perfuração com Z Collar não foi anexado ou não corresponde aos furos (X/Y dentro de ' +
-        `${roundForMessage(config.matchToleranceM)} m).`
-      );
-    }
 
     const warnings = [];
+    if (holes.length && resolved === 0) {
+      warnings.push(
+        'Nenhum furo com cota; Z em branco. O Z do Config Final não é cota (faixa de ' + config.minM + ' a ' + config.maxM + ' m) ' +
+        'e nenhum Z Collar do Plano de Perfuração foi conferido (X/Y dentro de ' + `${roundForMessage(config.matchToleranceM)} m).`
+      );
+    }
     if (invalidFinal.length) {
       const examples = invalidFinal.slice(0, 3).map(hole => `${hole.number} = ${roundForMessage(hole.z)}`).join('; ');
       warnings.push(

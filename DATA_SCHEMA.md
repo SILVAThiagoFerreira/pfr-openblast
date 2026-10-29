@@ -22,7 +22,7 @@ Campos principais:
 - `Number` integer
 - `X` float
 - `Y` float
-- `Z` float — cota (elevação, m) do collar. Se o valor estiver fora da faixa `business.elevation_plausible_min_m`..`max_m`, não é cota (pode ser coordenada X, como no export de 27/10/2026): a cota é obtida pela seção "Plano de Perfuração (cota)".
+- `Z` float — cota (elevação, m) do collar. Se o valor estiver fora da faixa `business.elevation_plausible_min_m`..`max_m`, não é cota (pode ser coordenada X, como no export de 27/10/2026): a cota é obtida pela seção "Plano de Perfuração (cota)". Sem cota válida, `Z` e `Z_Toe` de saída ficam vazios e há aviso (nunca bloqueio).
 - `X_Toe` float
 - `Y_Toe` float
 - `Z_Toe` float — cota do fundo; segue `Z_Toe = Z - Length * cos(Angle)` no export verificado.
@@ -50,7 +50,7 @@ Campos usados:
 - `Z Collar` float — cota da boca (usada como `Z (crest)`).
 - `Z Toe`, `Depth`, `Dip` — presentes na planilha, não usados pela cota (a profundidade realizada e a inclinação do Config Final definem o `Z (toe)`).
 
-Regras de identificação: `ID` repetido impede a cota desse furo (aviso). Faltando qualquer das quatro colunas, a validação interrompe a execução.
+Regras de identificação: `ID` repetido impede a cota desse furo (aviso). Faltando qualquer das quatro colunas, a planilha não é usada como fonte de cota (aviso "colunas ... não encontradas; a cota (Z) não foi lida desta planilha") e a execução continua; furos sem cota ficam com `Z (crest)` e `Z (toe)` em branco.
 
 Configuração (`config.yaml`, espelhada em `public/config.js`):
 - `business.elevation_plausible_min_m` (-500) e `business.elevation_plausible_max_m` (5000): faixa de cota aceita.

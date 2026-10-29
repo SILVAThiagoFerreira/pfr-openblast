@@ -38,10 +38,12 @@ Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), confi
 
 - Z do Config Final só é usado como cota dentro da faixa configurada; caso contrário, Z (crest) vem do Plano de Perfuração (Z Collar) com X/Y conferidos.
 - Z (toe) do Config Final ou calculado pela geometria realizada, com aviso.
-- Furos sem cota ficam em branco com aviso (sem erro silencioso); sem cota em nenhum furo, a execução para com erro.
+- Furos sem cota ficam em branco com aviso (sem erro silencioso); sem cota em nenhum furo, a execução NÃO para: gera o Excel com Z em branco e o aviso "Nenhum furo com cota; Z em branco" (site e log da CLI).
+- Planilha de plano sem `Z Collar` (ou demais colunas de cota) não bloqueia: aviso e cota não lida dela.
 - Configuração nova: `business.elevation_*`, `inputs.pp.design_patterns`, `validation.required_design_columns`.
 - Testes: `tests/test_elevation.js`, `tests/test_elevation.py`, `tests/test_frontend.js` (routing e docs/) e `tests/test_browser_config.py` (espelho das chaves).
-- Pendência aberta: cinco furos do Config Final (1000, 1001, 1002, 1004 e 1006) não existem no Plano de Perfuração do cenário; sem cota de referência, ficam sem Z. Decisão do usuário se deve haver cota de outra fonte ou bloqueio.
+- Decisão do usuário: quando faltar a cota, traga sem a cota (nunca bloquear). Cinco furos do Config Final (1000, 1001, 1002, 1004 e 1006) não existem no Plano de Perfuração do cenário e ficam sem Z, com aviso.
+- Testes: `tests/test_elevation.js` e `tests/test_elevation.py` (nenhum furo com cota: Z em branco + aviso, sem erro).
 
 ## Atualização do modo online
 - Permitir inclusão e remoção incremental de anexos sem reiniciar a seleção.

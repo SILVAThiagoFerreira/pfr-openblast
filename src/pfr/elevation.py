@@ -5,7 +5,8 @@
   a até `business.elevation_design_match_tolerance_m` do X/Y Collar do plano. Senão, vazio com aviso.
 - Z (toe): Z_Toe do Config Final quando o Z (crest) também veio do Config Final e o valor é cota plausível.
   Senão, Z (crest) - r_length * cos(r_angle), com aviso.
-- Nenhum furo com cota: erro explícito.
+- Nenhum furo com cota: não bloqueia. Z (crest) e Z (toe) ficam em branco e o aviso
+  "Nenhum furo com cota; Z em branco" é o primeiro da lista.
 """
 from __future__ import annotations
 
@@ -126,9 +127,10 @@ def resolve_elevations(merged: pd.DataFrame, design: pd.DataFrame | None, cfg: d
 
     resolved = int(crest.notna().sum())
     if len(result) and resolved == 0:
-        raise ValueError(
-            f"Não há cota (Z) válida para nenhum furo. O Z do Config Final não é cota (faixa de {low:g} a {high:g} m) "
-            f"e o Plano de Perfuração com Z Collar não foi anexado ou não corresponde aos furos "
-            f"(X/Y dentro de {_fmt(tolerance)} m)."
+        warnings.insert(
+            0,
+            "Nenhum furo com cota; Z em branco. O Z do Config Final não é cota (faixa de "
+            f"{low:g} a {high:g} m) e nenhum Z Collar do Plano de Perfuração foi conferido "
+            f"(X/Y dentro de {_fmt(tolerance)} m).",
         )
     return result, warnings

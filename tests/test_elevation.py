@@ -20,7 +20,7 @@ from pfr.config import load_config, normalize_config  # noqa: E402
 from pfr.elevation import resolve_elevations  # noqa: E402
 from pfr.io import read_design_table  # noqa: E402
 from pfr.models import SourceFiles  # noqa: E402
-from pfr.validation import validate_sources  # noqa: E402
+from pfr.validation import check_design_columns, validate_sources  # noqa: E402
 
 
 def _cfg():
@@ -99,10 +99,20 @@ class ElevationTest(unittest.TestCase):
         self.assertAlmostEqual(by_number.loc[171, "Z"], 287.63, places=6)
         self.assertIn("175 (X/Y diverge do plano em 2 m)", "\n".join(warnings))
 
-    def test_no_valid_elevation_stops_with_explicit_error(self):
+    def test_no_valid_elevation_leaves_z_blank_with_warning(self):
         cfg = _cfg()
-        with self.assertRaisesRegex(ValueError, "Não há cota \\(Z\\) válida para nenhum furo"):
-            resolve_elevations(SCENARIO_MERGED.iloc[:2], None, cfg)
+        data, warnings = resolve_elevations(SCENARIO_MERGED.iloc[:2], None, cfg)
+        self.assertTrue(data["Z"].isna().all())
+        self.assertTrue(data["Z_Toe"].isna().all())
+        self.assertTrue(warnings[0].startswith("Nenhum furo com cota; Z em branco."))
+        self.assertIn("Sem cota (Z) válida para 2 furo(s): 171 (Plano de Perfuração não anexado)", "\n".join(warnings))
+
+    def test_no_design_sheet_does_not_block_run(self):
+        cfg = _cfg()
+        data, warnings = resolve_elevations(SCENARIO_MERGED, None, cfg)
+        self.assertEqual(len(data), len(SCENARIO_MERGED))
+        self.assertTrue(data["Z"].isna().all())
+        self.assertIn("Nenhum furo com cota; Z em branco.", warnings[0])
 
     def test_design_sheet_is_selected_by_name_and_validated(self):
         cfg = _cfg()
@@ -133,8 +143,12 @@ class ElevationTest(unittest.TestCase):
 
             broken = root / "Plano de Perfuração.xlsx"
             pd.DataFrame({"ID": [171], "X Collar": [748776.29]}).to_excel(broken, sheet_name="PROJETO PERFURAÇÃO", index=False)
-            with self.assertRaisesRegex(ValueError, "Y Collar, Z Collar"):
-                validate_sources(SourceFiles(project=project, final=final, plan_pdf=None, histo_files=(), design=broken), cfg)
+            # Planilha sem colunas de cota não bloqueia: vira aviso e a cota não é lida dela.
+            validate_sources(SourceFiles(project=project, final=final, plan_pdf=None, histo_files=(), design=broken), cfg)
+            broken_table = read_design_table(broken, cfg["business"]["elevation_design_sheet_pattern"])
+            warnings = check_design_columns(broken_table, cfg["validation"]["required_design_columns"], broken.name)
+            self.assertEqual(len(warnings), 1)
+            self.assertIn("Y Collar, Z Collar não encontradas; a cota (Z) não foi lida desta planilha.", warnings[0])
 
 
 if __name__ == "__main__":

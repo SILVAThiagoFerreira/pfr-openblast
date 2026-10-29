@@ -108,11 +108,16 @@ assert.equal(mismatch.byNumber.get(175).zToe, null);
 assert.match(mismatch.warnings.join('\n'), /Sem cota \(Z\) válida para 1 furo\(s\): 175 \(X\/Y diverge do plano em 2 m\)/);
 near(mismatch.byNumber.get(171).zCrest, 287.63);
 
-// 5) Sem nenhuma cota válida: erro explícito, não coluna vazia em silêncio.
-assert.throws(
-  () => elevation.resolveElevations(scenarioHoles.slice(0, 2), [], config),
-  /Não há cota \(Z\) válida para nenhum furo\. O Z do Config Final não é cota \(faixa de -500 a 5000 m\)/
-);
+// 5) Sem nenhuma cota válida: não bloqueia. Z (crest) e Z (toe) ficam em branco e o aviso vem primeiro.
+const allMissing = elevation.resolveElevations(scenarioHoles.slice(0, 2), [], config);
+assert.equal(allMissing.counts.final + allMissing.counts.design, 0);
+for (const value of allMissing.byNumber.values()) {
+  assert.equal(value.zCrest, null);
+  assert.equal(value.zToe, null);
+}
+assert.match(allMissing.warnings[0], /^Nenhum furo com cota; Z em branco\. O Z do Config Final não é cota \(faixa de -500 a 5000 m\)/);
+assert.match(allMissing.warnings.join('\n'), /Sem cota \(Z\) válida para 2 furo\(s\): 171 \(Plano de Perfuração não anexado\)/);
+assert.equal(elevation.resolveElevations([], [], config).warnings.length, 0);
 
 // 6) Sem comprimento ou inclinação, Z (toe) fica vazio e é contado como ausente.
 const noGeometry = elevation.resolveElevations(
