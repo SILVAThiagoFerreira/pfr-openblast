@@ -19,8 +19,9 @@ Regras operacionais atuais:
 - A publicação no GitHub Pages deve operar sem inteligência artificial, chave de API ou serviço pago; o modo público processa os anexos localmente no navegador.
 - O site deve oferecer um bloco opcional para informar o total de carga realizada em kg, a carga mínima por furo e o ID do furo que receberá o mínimo; quando habilitado, deve distribuir a diferença em todo o plano, fixar esse mínimo no ID informado, preservar exatamente todos os furos empatados na maior carga original da planilha e fechar o total informado, validando combinações inviáveis e o conflito de um ID mínimo que já seja máximo.
 - A interface pública deve identificar as tabelas pelas colunas, validar a assinatura do PDF, rejeitar anexos duplicados/excessivos e gerar log local quando a validação falhar.
-- A interface pública deve orientar os cinco arquivos: Config Final.csv, Projeto Completo.csv, Historial da DRB, Plano de Perfuração.xlsx e Plano de Perfuração.pdf; no modo forçado, o Historial da DRB pode ser omitido.
-- O histórico da DRB deve aceitar o padrão `*_histo.log`, com blocos `[StartProcedure]`, linhas `BP:` e eventos `[Fire]`.
+- A interface pública deve orientar os cinco arquivos: Config Final.csv, Projeto Completo.csv, Historial da BMO, Plano de Perfuração.xlsx e Plano de Perfuração.pdf; no modo forçado, o Historial da BMO pode ser omitido.
+- O histórico da BMO deve aceitar o padrão `*_histo.log`, com blocos `[StartProcedure]`, linhas `BP:` e eventos `[Fire]`.
+- O site deve importar um arquivo `.brex` do BMO pelo botão "Importar BREX (BMO)", listar os disparos com ajuste de horário em horas (padrão `business.brex_offset_hours`) aplicado ao vivo e preencher o horário de desmonte com o disparo escolhido (HH:MM). Os disparos que combinam com o ID informado ficam em destaque e primeiro na lista.
 - O site deve oferecer conversão de fuso no processamento, com `UTC-03:00` como opção padrão e o resultado registrado no Excel.
 - O site deve disponibilizar exatamente os três modelos oficiais para download, preservando os nomes originais: “Plano de Fogo - PC.xls” (Modelo - Pré-Corte - SEM FUROS), “Plano de Fogo Realizado - PP.xlsx” (Modelo - Produção) e “Plano Realizado - REG .xls” (Modelo - Regularização).
 

@@ -11,6 +11,10 @@ window.PFR_BROWSER_CONFIG = {
     stemmingMaxDelta: 0.12,
     redistributeZeroCharges: true,
     chargeTarget: 17136.048,
-    zeroChargeMinimum: 0.01
+    zeroChargeMinimum: 0.01,
+    // Importação do BREX (BMO): o relógio do BMO grava em UTC; -3 converte para Brasília.
+    brexOffsetHours: -3,
+    brexOffsetMinHours: -12,
+    brexOffsetMaxHours: 14
   }
 };

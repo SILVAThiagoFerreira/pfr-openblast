@@ -8,7 +8,8 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Realizado: `Config Final.csv` (`*CONFIG FINAL*`), exportado após Atualização dos Furos
 - Plano Excel: `Plano de Perfuração.xlsx`
 - Plano PDF: `Plano de Perfuração.pdf` (`PP*.pdf` ou `PP.pdf`)
-- Histórico da DRB: `.txt` ou novo padrão `*_histo.log`; obrigatório no modo automático e opcional no modo forçado
+- Histórico da BMO: `.txt` ou novo padrão `*_histo.log`; obrigatório no modo automático e opcional no modo forçado
+- Relatório BREX (BMO) — opcional, somente no site: arquivo `*.brex` (XML `DB_BLASTREPORT_EXCHANGE`) exportado pelo sismógrafo BMO. Serve apenas para preencher o horário de desmonte; não entra no Excel como fonte de dados. Formato em `DATA_SCHEMA.md`, seção "Entrada BREX (BMO)".
 
 ## Regras
 - O ID do plano deve ser resolvido de forma auditável. O sistema tenta extrair o ID nesta ordem: (1) regex configurado no conteúdo do PDF, (2) regex configurado no conteúdo do HISTO, (3) padrão PP nos nomes dos arquivos de entrada, (4) `business.fallback_plan_id`. O modo `"auto"` habilita todas as fontes; o modo `"fallback"` usa apenas nomes de arquivo e fallback.
@@ -48,6 +49,16 @@ No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`.
 O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado.
 
 Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e pode ignorar a divergência de identificação ou a ausência total do HISTO. Sem HISTO, a data e o horário locais informados no site são obrigatórios e não recebem conversão de fuso; o ID, as colunas, o PDF, os furos e as temporizações continuam sendo validados.
+
+## Importação do BREX (BMO) no site
+- O botão "Importar BREX (BMO)", ao lado de "Horário local do desmonte", lê um ou mais arquivos `.brex` somente no navegador. Nenhum arquivo é enviado a servidor.
+- Validação: o arquivo deve ser XML bem formado com raiz `DB_BLASTREPORT_EXCHANGE`. Tag fora de ordem, texto fora da raiz, data ou horário de disparo inválidos interrompem a importação com mensagem que indica o arquivo. Um bloco `DATA` sem `FIRING_DATE` e `FIRING_TIME_START` gera aviso e é ignorado; se nenhum bloco tiver disparo, a importação falha. Nenhum disparo é inventado.
+- Horário: o disparo é o `FIRING_TIME_START` do bloco, lido como relógio do BMO. O ajuste em horas inteiras é aplicado a todos os horários listados (`horário ajustado = horário do BMO + ajuste`). O padrão vem de `business.brex_offset_hours` (-3, para equipamento em UTC e horário de Brasília), com limites `business.brex_offset_min_hours` e `business.brex_offset_max_hours`. Ajuste não inteiro ou fora dos limites é recusado e a lista não é exibida.
+- Identificadores de cada disparo: plano, nome do BMO (`DISPLAYED_NAME`), evento (`BLAST_EVENT_ID` com `FIRING_TAG`), número de série do BMO (`DATA@DBD_SN`) e nome do arquivo. Um plano é extraído somente do nome do BMO, como `PP` seguido de 6 a 8 dígitos ou de 6 dígitos isolados, validado pela regra `PLANO;MÊS;ANO`. O nome do arquivo não é usado para extrair plano.
+- Ranking: (1) pontuação pelo ID/nome digitado em "ID / nome do plano de fogo em trabalho"; (2) disparos na data informada em "Data local do desmonte"; (3) ordem cronológica. Pontuação: mesmo plano e ano, com mês ignorado, 90; igualdade após remover acentos, caixa, espaços e pontuação, 100; contenção de texto com 3 ou mais caracteres, 70; metade ou mais das palavras encontradas, de 20 a 40. Disparos com pontuação acima de zero ficam em destaque, mas não são preenchidos automaticamente. O ranking é refeito ao alterar o ID, a data ou o ajuste.
+- Seleção: o disparo escolhido preenche "Horário local do desmonte" em HH:MM, com o horário ajustado. Data e ID não são alterados. Se o ajuste mudar depois da escolha e o campo ainda tiver o horário preenchido pelo botão, o horário acompanha o novo ajuste; horário digitado pelo usuário não é sobrescrito.
+- Rótulo do disparo escolhido: plano do evento; sem plano no evento, o ID digitado; sem ambos, o nome do BMO, o número do evento ou a série do BMO.
+- Limites: somente HH:MM é preenchido, sem segundos (o `FIRING_TIME_START` pode ter segundos). O BREX não substitui o HISTO e não participa do processamento pela linha de comando.
 
 ## Determinismo
 - Ordenação por `Number`.

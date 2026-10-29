@@ -201,10 +201,10 @@
     const planId = manualPlanId || hintValues[0] || '';
     if (!planId) throw planError('Informe o ID numérico do plano ou envie um anexo com o ID do plano antes de forçar a execução.', 'MISSING_PLAN_ID');
     if (!manualFireDate) {
-      throw planError('O Historial da DRB não foi anexado. Informe a data local do desmonte no site para forçar a execução.', 'MISSING_FIRE_DATE');
+      throw planError('O Historial da BMO não foi anexado. Informe a data local do desmonte no site para forçar a execução.', 'MISSING_FIRE_DATE');
     }
     if (!manualFireTime) {
-      throw planError('O Historial da DRB não foi anexado. Informe o horário local do desmonte no site para forçar a execução.', 'MISSING_FIRE_TIME');
+      throw planError('O Historial da BMO não foi anexado. Informe o horário local do desmonte no site para forçar a execução.', 'MISSING_FIRE_TIME');
     }
     return {
       planId,

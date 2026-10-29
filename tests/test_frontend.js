@@ -43,7 +43,15 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(html, /id="manual-fire-time"/);
   assert.match(html, /for="manual-fire-time"[^>]*>Horário local do desmonte/);
   assert.match(html, /id="manual-fire-time-error"/);
-  assert.match(html, /obrigatório sem o Historial da DRB/);
+  assert.match(html, /obrigatório sem o Historial da BMO/);
+  assert.match(html, /id="brex-import-button"[^>]*>Importar BREX \(BMO\)/);
+  assert.match(html, /id="brex-file"[^>]*accept="\.brex"/);
+  assert.match(html, /id="brex-panel"[^>]*hidden/);
+  assert.match(html, /id="brex-offset-hours"[^>]*type="number"/);
+  assert.match(html, /id="brex-list"/);
+  assert.match(html, /src="\.\/brex\.js\?[^"]*"[\s\S]*src="\.\/brex-import\.js\?[^"]*"[\s\S]*src="\.\/app\.js\?/);
+  assert.match(html, /href="\.\/brex-import\.css\?/);
+  assert.doesNotMatch(html, /DRB/);
   assert.match(html, /id="force-submit"[^>]*>Forçar execução/);
   assert.match(html, /id="charge-target-input"/);
   assert.match(html, /id="charge-minimum-input"/);
@@ -80,7 +88,10 @@ for (const root of [publicRoot, docsRoot]) {
     'only the three authoritative model files should be published',
   );
   assert.match(app, /\.(?:txt|log)/);
-  assert.match(app, /Historial da DRB/);
+  assert.match(app, /Historial da BMO/);
+  assert.doesNotMatch(app, /DRB/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'plan-id.js'), 'utf8'), /DRB/);
+  assert.match(fs.readFileSync(path.join(root, 'brex-import.js'), 'utf8'), /OpenBlastBrex\.parseBrex/);
   assert.equal(fs.existsSync(path.join(root, 'force-execution.css')), true);
   assert.match(app, /parseManualPlanId/);
   assert.match(app, /manualFireDate/);
@@ -102,7 +113,7 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /Furos no Config Final/);
 }
 
-for (const file of ['index.html', 'app.js', 'config.js', 'plan-id.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js']) {
+for (const file of ['index.html', 'app.js', 'config.js', 'plan-id.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js', 'brex.js', 'brex-import.js', 'brex-import.css']) {
   assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 

@@ -6,8 +6,9 @@
   <meta name="description" content="Geração local do Plano de Fogo Realizado em Excel.">
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261018-clean-ui2">
+  <link rel="stylesheet" href="./styles.css?v=20261029-band-fit">
   <link rel="stylesheet" href="./force-execution.css?v=20260917-charge-minimum">
+  <link rel="stylesheet" href="./brex-import.css?v=20261029-brex">
 </head>
 <body>
   <header class="enaex-band">
@@ -34,7 +35,7 @@
         <span class="summary-icon" aria-hidden="true">i</span>
         <span>
           <strong id="input-tutorial-title">O que anexar</strong>
-          <span class="summary-note">Arquivos do mesmo plano · Historial da DRB recomendado</span>
+          <span class="summary-note">Arquivos do mesmo plano · Historial da BMO recomendado</span>
         </span>
         <span class="summary-chevron" aria-hidden="true">⌄</span>
       </summary>
@@ -51,7 +52,7 @@
           </li>
           <li class="input-tutorial__item">
             <span class="number">03</span>
-            <div><strong>Historial da DRB</strong><span><code>.txt</code> ou <code>.log</code> com <code>[Fire]</code>; opcional na execução forçada.</span></div>
+            <div><strong>Historial da BMO</strong><span><code>.txt</code> ou <code>.log</code> com <code>[Fire]</code>; opcional na execução forçada.</span></div>
           </li>
           <li class="input-tutorial__item">
             <span class="number">04</span>
@@ -105,12 +106,33 @@
             <input id="manual-fire-date" name="manualFireDate" type="date" autocomplete="off" aria-describedby="manual-fire-date-help manual-fire-date-error">
             <p id="manual-fire-date-help" class="field-help">Sem HISTO, informe a data em que o desmonte aconteceu. Com HISTO, deixe em branco para usar a data do evento.</p>
             <p id="manual-fire-date-error" class="field-error" role="alert" hidden></p>
-            <label for="manual-fire-time">Horário local do desmonte <span class="label-note">(obrigatório sem o Historial da DRB)</span></label>
-            <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
+            <label for="manual-fire-time">Horário local do desmonte <span class="label-note">(obrigatório sem o Historial da BMO)</span></label>
+            <div class="fire-time-row">
+              <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
+              <button id="brex-import-button" class="brex-import-button" type="button" aria-controls="brex-panel">Importar BREX (BMO)</button>
+              <input id="brex-file" name="brexFile" type="file" accept=".brex" multiple hidden>
+            </div>
             <p id="manual-fire-time-help" class="field-help">Usado quando o HISTO não for anexado ou não trouxer um <code>[Fire]</code> legível.</p>
             <p id="manual-fire-time-error" class="field-error" role="alert" hidden></p>
+            <p id="brex-import-error" class="field-error" role="alert" hidden></p>
           </fieldset>
         </div>
+
+        <section id="brex-panel" class="brex-panel" aria-labelledby="brex-title" hidden>
+          <div class="brex-panel__head">
+            <h3 id="brex-title">Disparos do BREX (BMO)</h3>
+            <span id="brex-summary" class="brex-panel__summary"></span>
+          </div>
+          <div class="brex-panel__offset">
+            <label for="brex-offset-hours">Ajuste do horário do BMO <span>(horas)</span></label>
+            <input id="brex-offset-hours" name="brexOffsetHours" type="number" step="1" inputmode="numeric" autocomplete="off" aria-describedby="brex-offset-help brex-offset-error">
+            <p id="brex-offset-help" class="field-help">O BMO grava em UTC; o padrão -3 converte para o horário de Brasília. O ajuste vale para todos os horários listados.</p>
+            <p id="brex-offset-error" class="field-error" role="alert" hidden></p>
+          </div>
+          <p id="brex-status" class="brex-panel__status" role="status" aria-live="polite"></p>
+          <p id="brex-warnings" class="field-help" hidden></p>
+          <ol id="brex-list" class="brex-list" aria-label="Disparos encontrados no BREX"></ol>
+        </section>
 
         <details class="advanced-options">
           <summary>
@@ -171,7 +193,7 @@
       <div class="generation-actions">
         <button id="submit" type="submit">Validar e gerar Excel <span aria-hidden="true">→</span></button>
         <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span aria-hidden="true">→</span></button>
-        <p id="force-help" class="field-help force-help">Use só quando o contexto explicar a divergência. Sem o Historial da DRB, informe a data e o horário acima.</p>
+        <p id="force-help" class="field-help force-help">Use só quando o contexto explicar a divergência. Sem o Historial da BMO, informe a data e o horário acima.</p>
       </div>
 
       <div id="progress" class="progress" hidden aria-live="polite">
@@ -211,6 +233,8 @@
   <script src="./timing.js?v=20260720-carga-alvo"></script>
   <script src="./charge.js?v=20260917-charge-minimum"></script>
   <script src="./timezone.js?v=20260812"></script>
-  <script src="./app.js?v=20261006-manual-fire-date-summary"></script>
+  <script src="./brex.js?v=20261029-brex"></script>
+  <script src="./brex-import.js?v=20261029-brex"></script>
+  <script src="./app.js?v=20261029-brex"></script>
 </body>
 </html>

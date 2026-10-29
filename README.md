@@ -15,7 +15,8 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 - `input/*CONFIG FINAL*.csv|xlsx` — Config Final.csv, exportado após Atualização dos Furos
 - `input/PP.pdf` — Plano de Perfuração.pdf
 - `input/PP*.xlsx` — Plano de Perfuração.xlsx
-- `input/HISTO-*.txt|*_histo.log` — histórico da DRB, obrigatório na validação automática e opcional na execução forçada
+- `input/HISTO-*.txt|*_histo.log` — histórico da BMO, obrigatório na validação automática e opcional na execução forçada
+- `*.brex` — relatório BREX do BMO; opcional e somente no site, para preencher o horário de desmonte (ver "Importação do BREX (BMO)")
 
 ## Saídas
 - `output/Plano_Fogo_Realizado_<PLANO>.xlsx`
@@ -52,6 +53,7 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - O histórico antigo `.txt`, o padrão `*_histo.log` e o log DBD `BMO-*_history_DBD.log` são aceitos. O parser reconhece `[BlastingPlan]` e `[BlastPlan]`, além de eventos com data completa ou somente `HH:MM:SS`, herdando a última data completa do histórico.
 - Se o horário do `[Fire]` não puder ser identificado, a tela solicita o horário local do desmonte. O campo `Data local do desmonte` permite corrigir a data; sem HISTO, o botão **Forçar execução** exige que o usuário informe data e horário, sem consultar o relógio do computador. Com HISTO, a data do `[Fire]` é usada quando o campo fica vazio; uma data informada manualmente prevalece. Se houver HISTO, mas nenhum horário `[Fire]` legível, a execução forçada sem horário preenchido mantém o fallback explícito `12:00:00` local. Valores manuais e esse fallback não recebem conversão de fuso.
 - A opção de fuso do site converte somente o horário lido do HISTO antes de gerar o Excel; `UTC-03:00` é o padrão para o horário local de Brasília.
+- O botão **Importar BREX (BMO)**, ao lado de "Horário local do desmonte", lê um relatório `.brex` do BMO no navegador, lista os disparos com o ajuste de horário aplicado e preenche o horário com o disparo escolhido (ver seção abaixo).
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`; se a geração for acionada sem anexos, informa o próximo passo no próprio resultado, sem iniciar processamento vazio.
@@ -65,6 +67,21 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 O fluxo público é organizado em uma única área operacional: o tutorial dos cinco tipos de entrada, as opções de saída e os modelos de apoio ficam recolhíveis para manter a tela compacta. A identificação e o horário permanecem visíveis, enquanto fuso e distribuição de carga ficam em opções avançadas. Os anexos continuam incrementais e o log considera a lista completa de arquivos já adicionados.
 
 A seção **Modelos de apoio** publica os três arquivos oficiais com os nomes originais preservados no download: `Plano de Fogo - PC.xls` (Pré-Corte - SEM FUROS), `Plano de Fogo Realizado - PP.xlsx` (Produção) e `Plano Realizado - REG .xls` (Regularização).
+
+## Importação do BREX (BMO)
+Na tela de identificação e horário, o botão **Importar BREX (BMO)** abre a escolha de um ou mais arquivos `.brex` exportados pelo BMO. A leitura é feita no próprio navegador; o arquivo não é enviado a servidor.
+
+- O relógio do BMO grava em UTC. O campo **Ajuste do horário do BMO (horas)** converte os horários listados; o padrão é `-3` (Brasília). O valor é aplicado ao vivo a todos os disparos.
+- A lista mostra data, horário ajustado e identificadores (plano, nome do BMO, evento, série do BMO e nome do arquivo). Disparos que combinam com o ID informado aparecem primeiro e destacados.
+- Ao clicar em um disparo, o campo **Horário local do desmonte** recebe o horário em HH:MM. A data e o ID não mudam; segundos não são preenchidos.
+- Sem ID de plano no evento, o rótulo do disparo escolhido é o ID digitado no campo de identificação.
+- Em caso de arquivo inválido, a importação é recusada com a mensagem do erro; nenhum horário é inventado.
+
+Configuração (`config.yaml`, espelhada em `public/config.js`):
+- `business.brex_offset_hours`: ajuste padrão em horas (`-3`).
+- `business.brex_offset_min_hours` e `business.brex_offset_max_hours`: limites aceitos (`-12` e `14`).
+
+Formato do arquivo e regras de leitura: `DATA_SCHEMA.md`, seção "Entrada BREX (BMO)".
 
 ## Regra de plano e horario
 Para evitar capturar ID de detonador como se fosse plano, configure `business.fallback_plan_id` com o plano operacional quando necessario. O ID e interpretado como `PLANO;MÊS;ANO`: o sistema associa o bloco do HISTO pelo mesmo plano e ano, ignorando o mês, porque o plano pode ser emitido em um mês e detonado em outro. A data/hora do disparo e extraida pelo primeiro `[Fire]` posterior ao bloco `[BlastingPlan]` correspondente. Zeros à esquerda e separadores não alteram a identidade; o ID do evento no HISTO é usado na saída. Se houver mais de um bloco compatível, o mês coincidente é usado como desempate; persistindo múltiplos candidatos, a execução é interrompida com erro de ambiguidade.

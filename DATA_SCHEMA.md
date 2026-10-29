@@ -71,6 +71,33 @@ Campos/eventos usados:
 - O campo online `manualFireDate` aceita uma data ISO (`AAAA-MM-DD`). Se informado, ele define a data local do evento; sem HISTO, a execução forçada exige essa data e `manualFireTime`, registra `historySource: missing` e `dateSource: manual`, e não consulta a data do computador. A data e o horário informados são locais e não recebem conversão de fuso.
 - Com HISTO, a data do primeiro `[Fire]` do bloco compatível continua sendo usada quando o campo de data fica vazio. Uma data digitada explicitamente prevalece sobre a data lida do HISTO e é mantida como data local.
 
+## Entrada BREX (BMO)
+Arquivo: `*.brex` exportado pelo sismógrafo BMO; lido somente no navegador, na importação do botão "Importar BREX (BMO)". Não é entrada do processamento pela linha de comando.
+
+Formato: XML 1.0 em UTF-8 (uma cópia com BOM também é aceita). A raiz é `DB_BLASTREPORT_EXCHANGE`; `XSD_VERSION` vale `1.2` nas amostras.
+
+Campos usados:
+- `BLAST_CONTEXT/BLAST_EVENT_ID` abre um registro de evento; `BLAST_CONTEXT/TAG/FIRING_TAG` marca o evento de disparo. O evento usado como identificador é o último com `FIRING_TAG`, ou o último evento se nenhum tiver a marca.
+- `DATA@DBD_SN` é o número de série do BMO (ex.: `312`).
+- `DATA/DISPLAYED_NAME` é o nome do disparo no BMO. Pode ser um ID de plano (ex.: `PP590926`, `490926_B`), um nome sem ID (ex.: `REG_41__`) ou vazio.
+- `DATA/SUMMARY_UNIT/CHRONO/FIRING_DATE` (`AAAA/MM/DD`), `FIRING_TIME_START` (`HH:MM:SS`) e `FIRING_TIME_END`. O disparo é o `FIRING_TIME_START` do bloco.
+- `DATA/SUMMARY_UNIT/SUMMARY_DET/TOTAL` é o número de detonadores (opcional).
+- `DATA/DETAIL_UNIT/DETONATOR` (`HOLE_ID`, `HOLE_RANK`, `PROGRAMMED_DELAY` etc.) não é usado pela importação.
+
+Regras de leitura:
+- Um disparo por bloco `DATA` com `FIRING_DATE` e `FIRING_TIME_START`. Bloco sem horário gera aviso e é ignorado; arquivo sem nenhum disparo, ou com data ou horário inválidos, é recusado.
+- O horário do BMO é relógio do dispositivo. Nas amostras ele é UTC: o `BLAST_EVENT_ID` tem a forma `RBC_ID` (3 dígitos) + epoch em segundos UTC, e o epoch fica a poucos segundos do `TESTING_TIME` do CHRONO. Por isso o ajuste padrão é -3 h.
+- Horário ajustado = horário do BMO + `business.brex_offset_hours` (inteiro de horas entre `brex_offset_min_hours` e `brex_offset_max_hours`). O ajuste pode mudar a data.
+- Plano extraído do nome do BMO: `PP` + 6 a 8 dígitos, ou 6 dígitos isolados, validados como `PLANO;MÊS;ANO` (`plan-id.js`). O nome do arquivo não é fonte de plano.
+
+Amostras observadas (7 arquivos de relatório, com um bloco `DATA` cada):
+- `BMO312_20261027.brex` (27/10/2026): `DISPLAYED_NAME` = `REG_41__`; `FIRING_TIME_START` = `15:00:56` (12:00 em Brasília); `FIRING_TIME_END` = `15:01:06`, janela de 10 s compatível com `MAX_DELAY` de 10132 ms. O nome `CRISTA F3` não está no arquivo: aparece só no nome da pasta. Os identificadores disponíveis são o número de série 312, o evento `3221793113124` e o nome do arquivo.
+- Outros arquivos de setembro/2026 têm `DISPLAYED_NAME` com plano (`PP560926`, `PP590926`, `490926_B`, `TB590926`) ou sem plano (`REG43092`), e `FIRING_TIME_START` entre 15:00 e 15:02 (UTC).
+
+Disparo usado pela interface (`brex.js`): `{ bmoSerial, displayName, planIds, eventNumber, detonators, date (AAAA-MM-DD, do BMO), time (HH:MM:SS, do BMO), fileName }`.
+
+Rótulo do disparo escolhido: plano do evento; sem plano, o ID digitado no campo de identificação; sem ele, o nome do BMO, o evento ou a série do BMO. O horário preenchido em `Horário local do desmonte` é HH:MM (sem segundos).
+
 ## Saída Excel
 Abas:
 - `Dados dos Furos`

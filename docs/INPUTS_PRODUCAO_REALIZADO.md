@@ -13,7 +13,7 @@ Lista consolidada dos arquivos de entrada do modulo de plano de fogo realizado d
 - `Projeto Completo.csv` -> arquivo de QAQC do O-PitSurface
 - `Plano de Perfuração.xlsx` -> planilha do plano de perfuração
 - `Plano de Perfuração.pdf` -> PDF do plano de perfuração
-- `HISTO-*.txt` ou `*_histo.log` -> histórico da DRB (blast box), obrigatório no modo automático e opcional na execução forçada
+- `HISTO-*.txt` ou `*_histo.log` -> histórico da BMO (blast box), obrigatório no modo automático e opcional na execução forçada
 - `template Excel .xls` -> template do plano de fogo realizado de producao
 
 ## Regra Atual Dos Tempos

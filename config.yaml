@@ -44,6 +44,11 @@ business:
   fill_missing_detonating_time: true
   simulate_stemming_variation: true
   simulate_stemming_variation_max: 0.12
+  # Importação do BREX (BMO) no site: o relógio do BMO grava em UTC; -3 converte para Brasília.
+  # Espelhado em public/config.js (window.PFR_BROWSER_CONFIG.business); tests/test_brex_config.py verifica a igualdade.
+  brex_offset_hours: -3
+  brex_offset_min_hours: -12
+  brex_offset_max_hours: 14
 
 validation:
   required_project_columns:
