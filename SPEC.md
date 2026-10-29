@@ -40,15 +40,26 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Se `business.enforce_charge_total_target` estiver habilitado, exigir ao menos 3 furos com carga válida e abortar com erro claro quando o fechamento ao total alvo não puder ser feito preservando os extremos.
 - No site, rejeitar alvo ausente, não numérico ou menor/igual a zero; rejeitar carga mínima ausente, não numérica ou menor/igual a zero; rejeitar ID de furo vazio, inexistente ou duplicado; rejeitar ID que pertença ao grupo de máximos originais; rejeitar mínimo acima da maior carga da planilha e alvos que não possam ser distribuídos entre os limites preservados, com mensagem clara antes do download.
 - Validar que todos os tempos de detonação exportados sejam inteiros, não negativos, preenchidos e únicos.
-- Abortar com erro claro se algo crítico faltar. No modo automático, o HISTO e um evento `[Fire]` identificável são obrigatórios. No modo forçado, o HISTO pode ser omitido somente quando houver um ID de plano válido e o usuário informar a data e o horário locais do desmonte; nenhum deles é substituído pela data do computador.
+- Abortar com erro claro se algo crítico faltar. No modo automático, o HISTO e um evento `[Fire]` identificável são obrigatórios. No modo forçado, o HISTO pode ser omitido somente quando o usuário informar a data e o horário locais do desmonte; o ID do plano é resolvido pela ordem da seção "ID textual e ordem de resolução (site)", e nenhum dos três é substituído pela data do computador.
 - A aba `Resumo` do Excel deve conter somente as colunas `Plano`, `Data` e `Hora`, com uma linha de valores.
+- No site, os cabeçalhos das colunas obrigatórias são reconhecidos sem diferenciar caixa, acentos, espaços e separadores (ex.: `number` → `Number`, `z toe` → `Z_Toe`). Um cabeçalho só é ajustado quando a variação casa com uma única coluna conhecida e a coluna exata ainda não existe na tabela; cada ajuste aparece como aviso no resultado. Aliases já existentes (ex.: `Angle (º)`) são aplicados sem aviso.
+- No site, avisos de identificação (ID derivado do nome do arquivo ou ID gerado) e ajustes de cabeçalho não bloqueiam a geração. Continuam bloqueando: ausência de HISTO no modo automático, data ou horário ausentes no modo forçado, ID do plano inexistente no HISTO, anexos de planos diferentes, ambiguidade de blocos `[BlastingPlan]`, falta de colunas obrigatórias e qualquer erro de dados ou temporização.
 
 ## Identificação pública do plano
 No processamento local do navegador, o ID é interpretado como `PLANO;MÊS;ANO`. O prefixo `PP`, espaços, hífens, sublinhados e pontos são tolerados, e zeros à esquerda não alteram a identidade do plano. A fonte é priorizada pelo bloco `[BlastingPlan]` do HISTO que tenha o mesmo plano e ano das pistas dos arquivos/tabelas anexados, mesmo quando o mês de emissão for diferente do mês da detonação.
 
-O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado.
+O sistema detecta automaticamente o ID do plano a partir dos nomes dos arquivos de entrada (ex: `PP0370626.pdf`, `PP370726_B.xlsx`). Pequenas variações como zeros à esquerda, sufixos (`_B`, `_D`) e separadores diferentes são normalizadas. Se nenhum arquivo contiver um ID reconhecível, o fallback configurado é utilizado. No site, a resolução completa segue a seção "ID textual e ordem de resolução (site)".
 
 Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite registrar a identificação manual. Quando ela contém um ID numérico válido, esse ID é usado na coluna `Plano`, no nome do Excel e no resumo, mantendo também o ID localizado no HISTO quando forem diferentes. A página reconhece `BP:440826` e `BP: PP440826` no novo `.log`. O botão `Forçar execução` exige confirmação e pode ignorar a divergência de identificação ou a ausência total do HISTO. Sem HISTO, a data e o horário locais informados no site são obrigatórios e não recebem conversão de fuso; o ID, as colunas, o PDF, os furos e as temporizações continuam sendo validados.
+
+### ID textual e ordem de resolução (site)
+- Qualquer texto não vazio digitado no campo de identificação é aceito como ID do plano. Exemplos: `REG CRISTA F3`, `Área Norte 2`. O texto é gravado como digitado na coluna `Plano` e na aba `Resumo`; espaços laterais são removidos e acentos são mantidos.
+- Um ID numérico (`440726`, `PP440726`, `PP0440726_D`, `Plano 440726`) continua sendo normalizado para o número do plano e gravado como tal.
+- Quando o texto digitado contém um número de plano entre outras palavras (ex.: `REG 440726 CRISTA`), o número é usado apenas para localizar o bloco no HISTO; o texto digitado continua sendo o ID gravado.
+- Sem ID digitado, a ordem é: (1) ID numérico dos anexos ou do HISTO, sem aviso; (2) nome do PDF ou da planilha de plano dos anexos, sem termos genéricos (ex.: `Plano de Perfuração.pdf`, `PP.pdf`, `Projeto Completo`, `Config Final`), com o sublinhado trocado por espaço (`Crista_F3.pdf` → `Crista F3`), com aviso; (3) ID gerado `PFR_<AAAAMMDD>_<HHMMSS>` a partir da data e do horário do disparo já resolvidos, com aviso. O prefixo `PFR` e os termos genéricos vêm de `business.plan_label_fallback_prefix` e `business.plan_label_generic_names`.
+- O resultado informa a origem do ID (`Digitado`, `Anexos ou HISTO`, `Nome do arquivo (automático)` ou `Gerado (automático)`) e lista os avisos em um bloco próprio, sem bloquear o arquivo.
+- Nome do arquivo: ID numérico gera `Plano_Fogo_Realizado_PP<plano>.xlsx`; qualquer outro ID gera `Plano_Fogo_Realizado_<nome>.xlsx`, em que `<nome>` é o ID sem acentos, com espaços trocados por `_`, sem caracteres inválidos em nomes de arquivo e com no máximo `business.plan_label_max_length` caracteres. Se nada restar, o arquivo é `Plano_Fogo_Realizado.xlsx`, com aviso.
+- O HISTO continua sendo a fonte do disparo. Com HISTO, o ID encontrado nele é mostrado como `ID no HISTO` quando for diferente do ID gravado.
 
 ## Importação do BREX (BMO) no site
 - O botão "Importar BREX (BMO)", ao lado de "Horário local do desmonte", lê um ou mais arquivos `.brex` somente no navegador. Nenhum arquivo é enviado a servidor.
@@ -59,6 +70,7 @@ Na página pública, o campo `ID / nome do plano de fogo em trabalho` permite re
 - Seleção: o disparo escolhido preenche "Horário local do desmonte" em HH:MM:SS, com o horário ajustado. Data e ID não são alterados. Se o ajuste mudar depois da escolha e o campo ainda tiver o horário preenchido pelo botão, o horário acompanha o novo ajuste; horário digitado pelo usuário não é sobrescrito.
 - Rótulo do disparo escolhido: plano do evento; sem plano no evento, o ID digitado; sem ambos, o nome do BMO, o número do evento ou a série do BMO.
 - Limites: o horário preenchido mantém os segundos do `FIRING_TIME_START`. O BREX não substitui o HISTO e não participa do processamento pela linha de comando.
+- Arquivos `.brex` arrastados ou escolhidos no campo principal de anexos são encaminhados a esta importação e não entram na lista de anexos do plano. Os demais formatos seguem o fluxo normal de anexos.
 
 ## Determinismo
 - Ordenação por `Number`.

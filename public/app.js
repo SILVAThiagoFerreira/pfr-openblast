@@ -35,6 +35,7 @@ let applyingChargeSuggestion = false;
 
 const REQUIRED_PROJECT = ['Number', 'UTM_X', 'UTM_Y', 'Length_m', 'Stemming_m', 'Diameter_mm', 'Subdrilling_m', 'Angle_deg', 'Azimuth_deg', 'Total_Charge_kg'];
 const REQUIRED_FINAL = ['Number', 'X', 'Y', 'Z', 'X_Toe', 'Y_Toe', 'Z_Toe', 'Length', 'Stemming', 'Diameter', 'Subdrilling', 'Angle', 'Azimuth', 'DetonatingTime', 'InputedCharge'];
+const KNOWN_COLUMNS = [...new Set([...REQUIRED_PROJECT, ...REQUIRED_FINAL])];
 const OUTPUT_COLUMNS = ['Data', 'Horario', 'Plano', 'Tipo', 'id', 'y', 'x', 'Z (crest)', 'Z (toe)', 'profundidade prevista', 'profundidade realizada', 'azimute', 'inclinacao', 'cargas previstas', 'cargas realizadas', 'tampao previsto', 'tampao realizado', 'subfuracao', 'diametro', 'tempo detonacao (ms)'];
 const ALIASES = {
   'UTM X': 'UTM_X', 'UTM Y': 'UTM_Y', 'Length (m)': 'Length_m', 'Stemming (m)': 'Stemming_m',
@@ -47,6 +48,8 @@ const BUSINESS = {
   redistributeZeroCharges: true, chargeTarget: 17136.048, zeroChargeMinimum: 0.01,
   ...(window.PFR_BROWSER_CONFIG?.business || {})
 };
+// Identificação do plano e nomes de arquivo: valores vêm de config.js, sem padrões escondidos.
+const PLAN_LABEL_CONFIG = window.PFR_BROWSER_CONFIG?.business || {};
 
 document.querySelector('#year').textContent = new Date().getFullYear();
 if (typeof XLSX === 'undefined') {
@@ -106,13 +109,20 @@ function appendFiles(files) {
   syncInputFiles();
 }
 
+// Arquivos .brex não são anexos do plano: vão para a importação de horário do BREX.
+function routeBrexFiles(files) {
+  const brex = files.filter(file => window.OpenBlastBrexImport.isBrexFile(file));
+  if (brex.length) window.OpenBlastBrexImport.importFiles(brex);
+  return files.filter(file => !brex.includes(file));
+}
+
 input.addEventListener('change', () => {
-  appendFiles([...input.files]);
+  appendFiles(routeBrexFiles([...input.files]));
   input.value = '';
 });
 ['dragenter', 'dragover'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.add('drag'); }));
 ['dragleave', 'drop'].forEach(event => drop.addEventListener(event, e => { e.preventDefault(); drop.classList.remove('drag'); }));
-drop.addEventListener('drop', e => appendFiles([...e.dataTransfer.files]));
+drop.addEventListener('drop', e => appendFiles(routeBrexFiles([...e.dataTransfer.files])));
 syncActionControls();
 
 function makeClientLog(error, options = {}) {
@@ -371,11 +381,9 @@ function key(value) {
   return number === null ? String(value ?? '').trim() : String(number);
 }
 
-function normalizeRows(rows) {
-  return rows.map(row => Object.fromEntries(Object.entries(row).map(([name, value]) => [ALIASES[name.trim()] || name.trim(), value])));
-}
-
-async function readTable(file) {
+// Colunas obrigatórias são reconhecidas sem diferenciar caixa, acentos ou espaços (table-headers.js).
+// `renamed` lista os cabeçalhos ajustados, que viram aviso no resultado.
+async function readTableDetailed(file) {
   const ext = file.name.toLowerCase().split('.').pop();
   if (!['csv', 'xlsx', 'xlsm'].includes(ext)) throw new Error(`Formato de tabela não permitido: ${file.name}`);
   const bytes = await file.arrayBuffer();
@@ -383,7 +391,14 @@ async function readTable(file) {
     ? XLSX.read(new TextDecoder('utf-8').decode(bytes), { type: 'string', raw: true })
     : XLSX.read(bytes, { type: 'array', cellDates: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  return normalizeRows(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+  return window.OpenBlastTableHeaders.canonicalizeTable(XLSX.utils.sheet_to_json(sheet, { defval: '' }), {
+    knownColumns: KNOWN_COLUMNS,
+    aliases: ALIASES
+  });
+}
+
+async function readTable(file) {
+  return (await readTableDetailed(file)).rows;
 }
 
 function hasColumns(rows, columns) {
@@ -419,7 +434,10 @@ async function findSources(files, { allowMissingHistory = false } = {}) {
   setProgress(12, 'Lendo as tabelas e identificando os arquivos...');
   const tables = files.filter(file => /\.(csv|xlsx|xlsm)$/i.test(file.name));
   const parsedTables = await Promise.all(tables.map(async file => {
-    try { return { file, rows: await readTable(file) }; } catch (error) { return { file, rows: [], error }; }
+    try {
+      const table = await readTableDetailed(file);
+      return { file, rows: table.rows, renamed: table.renamed };
+    } catch (error) { return { file, rows: [], renamed: [], error }; }
   }));
   const namedProject = parsedTables.find(item => /projeto\s*completo/i.test(item.file.name) && hasColumns(item.rows, REQUIRED_PROJECT));
   const namedFinal = parsedTables.find(item => /config\s*final/i.test(item.file.name) && hasColumns(item.rows, REQUIRED_FINAL));
@@ -428,6 +446,11 @@ async function findSources(files, { allowMissingHistory = false } = {}) {
   if (projectEntry && finalEntry && projectEntry.file.name === finalEntry.file.name) {
     throw new Error('Os arquivos de projeto e realizado precisam ser tabelas diferentes.');
   }
+  // Aviso só para as tabelas que alimentam o cálculo; planilhas de apoio não entram no processamento.
+  const usedTables = new Set([projectEntry?.file, finalEntry?.file]);
+  const warnings = parsedTables
+    .filter(item => item.renamed?.length && usedTables.has(item.file))
+    .map(item => `${item.file.name}: cabeçalhos reconhecidos automaticamente (${item.renamed.map(change => `"${change.from}" → "${change.to}"`).join(', ')}).`);
   const textFiles = files.filter(file => /\.(?:txt|log)$/i.test(file.name));
   setProgress(30, allowMissingHistory ? 'Lendo as entradas; o histórico pode ser omitido no modo forçado...' : 'Lendo o histórico de disparos...');
   const textCandidates = await Promise.all(textFiles.map(async file => ({ file, text: decodeText(new Uint8Array(await file.arrayBuffer())) })));
@@ -437,11 +460,21 @@ async function findSources(files, { allowMissingHistory = false } = {}) {
   const histo = histoEntry?.file;
   const pdf = files.find(file => /\.pdf$/i.test(file.name));
   if (!projectEntry || !finalEntry) throw new Error('Não foi possível identificar as tabelas. Confira se uma contém as colunas do projeto e outra as colunas do realizado.');
-  if (!histo && !allowMissingHistory) throw new Error('Envie o Historial da BMO em HISTO-*.txt ou HISTO-*.log.');
+  if (!histo && !allowMissingHistory) throw new Error('Envie o Historial da BMO em HISTO-*.txt ou *_histo.log. Sem ele, use “Forçar execução” e informe a data e o horário do desmonte.');
   if (!pdf) throw new Error('Envie o PP.pdf.');
   const pdfHeader = decodeText(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
   if (!pdfHeader.startsWith('%PDF-')) throw new Error(`O arquivo ${pdf.name} não parece ser um PDF válido.`);
-  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry?.text || '', histoMissing: !histo, pdf, planHints: sourcePlanHints(files, parsedTables) };
+  return { project: projectEntry.file, projectRows: projectEntry.rows, final: finalEntry.file, finalRows: finalEntry.rows, histo, histoText: histoEntry?.text || '', histoMissing: !histo, pdf, planHints: sourcePlanHints(files, parsedTables), warnings };
+}
+
+// Nomes usados para derivar o ID do plano, na ordem de preferência: PDF primeiro,
+// depois os demais anexos que não são tabelas de projeto/realizado nem HISTO.
+function planDocumentNames(files, sources) {
+  const roles = new Set([sources.project, sources.final, sources.histo, sources.pdf].map(file => file?.name));
+  const others = files
+    .filter(file => !roles.has(file.name) && !/\.(?:txt|log|brex)$/i.test(file.name))
+    .map(file => file.name);
+  return [sources.pdf?.name, ...others].filter(Boolean);
 }
 
 async function sha256(bytes) {
@@ -640,6 +673,24 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
     event.date = window.OpenBlastPlanId.normalizeFireDate(manualFireDate);
     event.dateSource = 'manual';
   }
+  // Ordem: ID digitado -> ID dos anexos/HISTO -> nome do arquivo -> ID gerado (plan-label.js).
+  const identity = window.OpenBlastPlanLabel.resolvePlanIdentity({
+    typedRaw: planIdentity.raw || '',
+    manualPlanId: planIdentity.manualPlanId || '',
+    resolvedPlanId: resolvedEvent.planId || '',
+    fileNames: planDocumentNames(files, sources),
+    date: event.date,
+    time: event.time,
+    config: PLAN_LABEL_CONFIG
+  });
+  const resolvedNumericId = resolvedEvent.planId || '';
+  event.planId = identity.planId;
+  event.planIdSource = identity.source;
+  if (identity.source === 'typed' && resolvedNumericId && resolvedNumericId !== identity.planId && !sources.histoMissing && !event.histoPlanId) {
+    event.histoPlanId = resolvedNumericId;
+  }
+  const outputName = window.OpenBlastPlanLabel.outputFileName(event.planId, PLAN_LABEL_CONFIG);
+  const warnings = [...(sources.warnings || []), ...identity.warnings, ...outputName.warnings];
   setProgress(62, 'Montando os dados dos furos...');
   const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions);
   const data = builtRows.data;
@@ -653,6 +704,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   }
   return {
     workbook: buildWorkbook(data, event), event, rows: data.length,
+    fileName: outputName.fileName, warnings, planIdSource: identity.source,
     totalCharge: data.reduce((sum, row) => sum + (row['cargas realizadas'] ?? 0), 0),
     sourceFinalRows: builtRows.sourceFinalRows,
     excludedRows: builtRows.excludedRows,
@@ -686,9 +738,7 @@ async function runGeneration(force = false) {
     const chargeOptions = readChargeTarget();
     const generated = await generateLocally(attachedFiles, chargeOptions, { timezoneOffset: readTimezoneOffset() }, generationOptions);
     setProgress(88, 'Gerando o arquivo Excel...');
-    const filename = generated.event.planId
-      ? `Plano_Fogo_Realizado_PP${generated.event.planId}.xlsx`
-      : 'Plano_Fogo_Realizado.xlsx';
+    const filename = generated.fileName;
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
     const link = document.createElement('a');
     link.className = 'download'; link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
@@ -717,8 +767,20 @@ async function runGeneration(force = false) {
       targetNote.textContent = `Distribuição concluída em todo o plano: total de ${formatKg(generated.chargeTarget)} kg, mínimo de ${formatKg(generated.chargeMinimum)} kg no furo ${generated.chargeMinimumHoleId} e máximo de ${formatKg(generated.chargeMaximum)} kg preservado no furo ${generated.chargeMaximumHoleId}.`;
       result.append(targetNote);
     }
+    if (generated.warnings.length) {
+      const box = document.createElement('div');
+      box.className = 'result-warnings';
+      box.setAttribute('role', 'status');
+      const heading = document.createElement('strong');
+      heading.textContent = generated.warnings.length === 1 ? 'Aviso (não bloqueia o arquivo)' : `Avisos (${generated.warnings.length}; não bloqueiam o arquivo)`;
+      const items = document.createElement('ul');
+      generated.warnings.forEach(warning => { const item = document.createElement('li'); item.textContent = warning; items.append(item); });
+      box.append(heading, items);
+      result.append(box);
+    }
     const metrics = document.createElement('div'); metrics.className = 'metrics';
-    const metricsData = [['Plano', generated.event.planId], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Furos no Config Final', generated.sourceFinalRows.toLocaleString('pt-BR')], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${formatKg(generated.totalCharge)} kg`]];
+    const planSourceLabels = { typed: 'Digitado', documents: 'Anexos ou HISTO', 'file-name': 'Nome do arquivo (automático)', generated: 'Gerado (automático)' };
+    const metricsData = [['Plano', generated.event.planId], ['Origem do ID', planSourceLabels[generated.planIdSource] || generated.planIdSource], ['Arquivo', generated.fileName], ['Data do disparo', generated.event.date], ['Horário do disparo', generated.event.time], ['Furos no Config Final', generated.sourceFinalRows.toLocaleString('pt-BR')], ['Total de furos', generated.rows.toLocaleString('pt-BR')], ['Carga realizada', `${formatKg(generated.totalCharge)} kg`]];
     metricsData.push(['Fuso horário', generated.event.timezoneOffset || (generated.event.timeSource ? 'Horário local informado' : 'Original')]);
     metricsData.push(['Fonte da data', generated.event.dateSource === 'manual' ? 'Informada pelo usuário' : 'HISTO']);
     metricsData.push(['Historial da BMO', generated.event.historySource === 'missing' ? 'Não anexado (forçada)' : 'Anexado']);

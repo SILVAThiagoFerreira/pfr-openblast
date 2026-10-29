@@ -49,6 +49,27 @@ business:
   brex_offset_hours: -3
   brex_offset_min_hours: -12
   brex_offset_max_hours: 14
+  # Identificação do plano no site: ID digitado (número ou nome) é gravado como digitado.
+  # Sem ID digitado ou nos anexos, usa o nome do PDF/planilha (sem termos genéricos) e,
+  # por último, gera um ID com este prefixo e a data/horário do disparo (aviso no resultado).
+  # Espelhado em public/config.js; tests/test_browser_config.py verifica a igualdade.
+  plan_label_fallback_prefix: "PFR"
+  plan_label_max_length: 60
+  plan_label_generic_names:
+    - "pp"
+    - "pdf"
+    - "plano"
+    - "plano de perfuracao"
+    - "plano de fogo"
+    - "plano de fogo realizado"
+    - "plano realizado"
+    - "copia"
+    - "modelo"
+    - "historial da bmo"
+    - "projeto completo"
+    - "config final"
+    - "configuracao final"
+  output_name_text_template: "Plano_Fogo_Realizado_{plan_label}.xlsx"
 
 validation:
   required_project_columns:

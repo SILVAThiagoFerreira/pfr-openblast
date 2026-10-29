@@ -152,7 +152,7 @@
     }
     const plans = extractPlanIds(source).map(normalizePlanId);
     const planId = [...new Set(plans)].pop();
-    if (!planId) throw planError('Não foi possível identificar o plano no HISTO.', 'MISSING_PLAN_ID');
+    if (!planId) throw planError('Não foi possível identificar o plano no HISTO. Informe o ID numérico do plano (ex.: PP440726) para localizar o bloco do disparo.', 'MISSING_PLAN_ID');
     const fires = events.filter(event => event[1] === 'Fire' && event[3]);
     if (!fires.length) throw planError('Não foi possível identificar o horário do disparo no HISTO. Informe o horário do desmonte e tente novamente.', 'MISSING_FIRE_TIME');
     const fire = fires[fires.length - 1];
@@ -175,8 +175,8 @@
   function fallbackPlanAndFire(text, events, normalizedHints, manualPlanId, manualFireTime, forced) {
     const hintValues = [...normalizedHints];
     const histoPlanId = [...new Set(extractPlanIds(text).map(normalizePlanId).filter(Boolean))].pop() || '';
+    // Sem ID numérico, planId fica vazio: o chamador resolve o rótulo (ID digitado, nome do arquivo ou ID gerado).
     const planId = manualPlanId || hintValues[0] || histoPlanId;
-    if (!planId) throw planError('Informe o ID numérico do plano ou envie um anexo com o ID do plano antes de continuar.', 'MISSING_PLAN_ID');
     const date = historyDateFromEvents(events);
     if (!date) throw planError('Não foi possível identificar a data do disparo no HISTO.', 'MISSING_FIRE_DATE');
     if (!manualFireTime && !forced) {
@@ -198,8 +198,8 @@
     if (!manualPlanId && hintValues.length > 1) {
       throw planError(`Sem HISTO, informe manualmente o ID do plano quando os anexos apresentarem IDs diferentes (${hintValues.join(', ')}).`, 'MULTIPLE_PLAN_HINTS');
     }
+    // Sem ID numérico, planId fica vazio e o chamador aplica a ordem de identificação (plan-label.js).
     const planId = manualPlanId || hintValues[0] || '';
-    if (!planId) throw planError('Informe o ID numérico do plano ou envie um anexo com o ID do plano antes de forçar a execução.', 'MISSING_PLAN_ID');
     if (!manualFireDate) {
       throw planError('O Historial da BMO não foi anexado. Informe a data local do desmonte no site para forçar a execução.', 'MISSING_FIRE_DATE');
     }
@@ -237,7 +237,6 @@
       || [...new Set(extractPlanIds(text).map(normalizePlanId).filter(Boolean))].pop()
       || '';
     const planId = requestedPlanId || histoPlanId;
-    if (!planId) throw planError('Informe o ID numérico do plano ou envie um anexo com o ID do plano antes de forçar a execução.', 'MISSING_PLAN_ID');
     if (!fire[2]) throw planError('Não foi possível identificar a data do disparo no HISTO.', 'MISSING_FIRE_DATE');
 
     const event = { planId, date: formatDate(fire[2]), time: manualFireTime || fire[3], forced: true };

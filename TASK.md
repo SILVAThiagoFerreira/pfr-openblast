@@ -41,3 +41,17 @@ Critério objetivo de conclusão:
 - Registrar no Excel e no log o ID efetivamente encontrado no HISTO quando houver diferença.
 - Quando o bloco de carga-alvo estiver habilitado, registrar no Excel o total aplicado, a carga mínima, o ID do furo de menor carga, a maior carga preservada e o ID do furo de maior carga.
 - Ao anexar os dados no site, sugerir automaticamente a menor carga positiva de `InputedCharge` e o primeiro ID correspondente para os campos de carga mínima e ID mínimo, sem sobrescrever edições manuais.
+
+## Atualização: identificação textual e avisos não bloqueantes (site)
+Motivo: um ID de plano textual (ex.: `REG CRISTA F3`) era descartado e a execução falhava com "Informe o ID numérico do plano", mesmo com os dados válidos. Objetivo: bloquear somente o que compromete os dados; o que é trivial vira aviso visível.
+
+Ordem de implementação aplicada (AGENTS.md): configuração (`config.yaml` e `public/config.js`), depois validação e resolução (`public/plan-label.js`, `public/table-headers.js`, `public/plan-id.js`), depois processamento (`public/app.js`), testes e documentação.
+
+- ID digitado, textual ou numérico, é o ID do plano. Sem ID digitado, usa-se o ID dos anexos/HISTO, depois o nome do PDF/planilha derivado (com aviso), depois um ID gerado `PFR_<data>_<horário>` (com aviso).
+- Nome de arquivo sanitizado para ID textual; ID numérico mantém `Plano_Fogo_Realizado_PP<plano>.xlsx`.
+- Cabeçalhos das colunas obrigatórias reconhecidos sem diferenciar caixa, acentos e espaços (aviso por ajuste).
+- Arquivo `.brex` no campo principal de anexos é encaminhado ao importador do BREX e não é mais tratado como anexo.
+- Mantido como erro (dados e regras de segurança): ausência de HISTO no modo automático, data/horário ausentes no modo forçado, HISTO sem nenhum bloco de plano para escolher o disparo, ID do HISTO diferente dos anexos sem forçar, anexos de planos diferentes, ambiguidade de blocos, colunas obrigatórias ausentes, e toda validação de furos, cargas e temporização.
+- Configuração nova: `business.plan_label_fallback_prefix`, `business.plan_label_max_length`, `business.plan_label_generic_names`, `business.output_name_text_template`. Espelho em `public/config.js`, verificado por `tests/test_browser_config.py`.
+- Testes: `tests/test_plan_label.js`, `tests/test_table_headers.js`, `tests/test_plan_id.js` (ID vazio sem bloqueio), `tests/test_frontend.js` (routing do BREX e espelho `docs/`).
+- Pendência aberta: no modo automático sem HISTO, a regra do SPEC continua bloqueando. Decisão do usuário se deve passar a aceitar data e horário informados.

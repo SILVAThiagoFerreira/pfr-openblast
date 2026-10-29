@@ -198,10 +198,15 @@
 
   importButton.addEventListener('click', () => fileInput.click());
 
-  fileInput.addEventListener('change', async () => {
-    const files = [...fileInput.files];
-    fileInput.value = '';
+  // Importa um ou mais .brex. Usado pelo botão e pelo campo de anexos principal,
+  // que encaminha arquivos .brex para cá em vez de tratá-los como anexo do plano.
+  async function importFiles(selected) {
+    const files = [...selected];
     if (!files.length) return;
+    if (!limits) {
+      setMessage(importError, 'A importação do BREX está desativada por configuração inválida.');
+      return;
+    }
     importButton.disabled = true;
     try {
       const parsed = await Promise.all(files.map(parseFile));
@@ -211,12 +216,25 @@
       chosen = null;
       setMessage(importError);
       render();
+      panel.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     } catch (error) {
       setMessage(importError, error.message);
+      importError.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     } finally {
       importButton.disabled = false;
     }
+  }
+
+  fileInput.addEventListener('change', () => {
+    const files = [...fileInput.files];
+    fileInput.value = '';
+    importFiles(files);
   });
+
+  window.OpenBlastBrexImport = {
+    importFiles,
+    isBrexFile: file => /\.brex$/i.test(file.name)
+  };
 
   // Ajuste ao vivo: se o horário ainda é o que o botão preencheu, acompanha o novo ajuste.
   offsetInput.addEventListener('input', () => {

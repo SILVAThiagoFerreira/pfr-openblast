@@ -560,6 +560,24 @@ button span { margin-left: 7px; font-size: 18px; }
   border-color: #efb9bd;
 }
 
+/* Avisos não bloqueantes: identificação resolvida por nome de arquivo ou ID gerado. */
+.result-warnings {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  color: #6b4a00;
+  background: #fff9e8;
+  border: 1px solid #e6c46a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.result-warnings strong { color: #6b4a00; }
+
+.result-warnings ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 .result h3 {
   margin: 0 0 12px;
   color: var(--gray);

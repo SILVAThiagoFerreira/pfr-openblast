@@ -6,7 +6,7 @@
   <meta name="description" content="Geração local do Plano de Fogo Realizado em Excel.">
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261029-band-fit">
+  <link rel="stylesheet" href="./styles.css?v=20261029-plan-label">
   <link rel="stylesheet" href="./force-execution.css?v=20260917-charge-minimum">
   <link rel="stylesheet" href="./brex-import.css?v=20261029-brex">
 </head>
@@ -76,10 +76,10 @@
       </div>
 
       <label id="dropzone" class="dropzone" for="inputs">
-        <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt,.log" required>
+        <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt,.log,.brex" required>
         <span class="upload-icon" aria-hidden="true">↑</span>
         <strong>Escolha os arquivos do plano</strong>
-        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT ou LOG</span>
+        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT, LOG ou BREX (o BREX preenche o horário, não é anexo)</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
 
@@ -96,8 +96,8 @@
           <fieldset class="plan-identity-settings">
             <legend>Identificação</legend>
             <label for="plan-identity">ID / nome do plano de fogo em trabalho</label>
-            <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou Plano 440726" aria-describedby="plan-identity-help">
-            <p id="plan-identity-help" class="field-help">Opcional. O ID informado será gravado no Excel.</p>
+            <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou REG CRISTA F3" aria-describedby="plan-identity-help">
+            <p id="plan-identity-help" class="field-help">Opcional. Aceita número (PP440726) ou nome (REG CRISTA F3); o texto é gravado no Excel como digitado. Sem ID, usa o dos anexos ou o nome do PDF.</p>
           </fieldset>
 
           <fieldset class="fire-time-settings">
@@ -228,13 +228,15 @@
 
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js?v=20260921-config-final"></script>
-  <script src="./plan-id.js?v=20261006-manual-fire-date"></script>
+  <script src="./config.js?v=20261029-plan-label"></script>
+  <script src="./plan-id.js?v=20261029-plan-label"></script>
+  <script src="./plan-label.js?v=20261029-plan-label"></script>
+  <script src="./table-headers.js?v=20261029-plan-label"></script>
   <script src="./timing.js?v=20260720-carga-alvo"></script>
   <script src="./charge.js?v=20260917-charge-minimum"></script>
   <script src="./timezone.js?v=20260812"></script>
   <script src="./brex.js?v=20261029-brex"></script>
-  <script src="./brex-import.js?v=20261029-brex"></script>
-  <script src="./app.js?v=20261029-brex"></script>
+  <script src="./brex-import.js?v=20261029-plan-label"></script>
+  <script src="./app.js?v=20261029-plan-label-2"></script>
 </body>
 </html>

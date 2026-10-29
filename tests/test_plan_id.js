@@ -85,9 +85,20 @@ assert.throws(() => planId.resolvePlanAndFire(missingHistory, ['550926'], {
 assert.throws(() => planId.resolvePlanAndFire(missingHistory, ['550926'], {
   force: true, manualPlanId: '550926', manualFireDate: '2026-09-26', allowMissingHistory: true
 }), error => error.code === 'MISSING_FIRE_TIME' && /horário local do desmonte/.test(error.message));
-assert.throws(() => planId.resolvePlanAndFire(missingHistory, [], {
+// Sem nenhum ID numérico, o plan-id.js devolve planId vazio; o rótulo é resolvido em plan-label.js.
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(missingHistory, [], {
   force: true, manualFireDate: '2026-09-26', manualFireTime: '12:00', allowMissingHistory: true
-}), error => error.code === 'MISSING_PLAN_ID');
+}))), {
+  planId: '', date: '26/09/2026', time: '12:00:00', forced: true,
+  timeSource: 'manual', dateSource: 'manual', historySource: 'missing'
+});
+assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(`[HistoryStart] 2026/08/04-14:00:00\n-\n[BlastPlan] 14:52:32\n`, [], {
+  manualFireTime: '11:30'
+}))), {
+  planId: '', date: '04/08/2026', time: '11:30:00', timeSource: 'manual'
+});
+// HISTO com [Fire] mas sem nenhum ID de plano: a seleção do disparo exige o plano, então continua bloqueada.
+assert.throws(() => planId.resolvePlanAndFire(`[Fire] 2026/08/04-15:29:45;83;+33.5\n`, []), error => error.code === 'MISSING_PLAN_ID' && /ID numérico/.test(error.message));
 assert.throws(() => planId.resolvePlanAndFire(crossMonthHistory, ['440726'], { manualFireDate: '2026-02-29' }), error => error.code === 'INVALID_FIRE_DATE');
 assert.deepEqual(JSON.parse(JSON.stringify(planId.resolvePlanAndFire(dbdHistory, ['440726'], { force: true }))), {
   planId: '440726', date: '04/08/2026', time: '15:05:22', forced: true

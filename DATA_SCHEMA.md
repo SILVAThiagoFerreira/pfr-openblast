@@ -112,3 +112,15 @@ Colunas principais em `Dados dos Furos`:
 IDs de plano podem aparecer como `PP370626`, `PP0370626` ou com separadores. A composição é `PLANO;MÊS;ANO`: os quatro últimos dígitos são mês e ano, e o trecho anterior é o plano. Para comparação, o prefixo e os separadores são removidos, zeros à esquerda do plano são ignorados, o ano deve ser igual e o mês é ignorado para permitir detonação em mês posterior ou anterior ao mês de emissão. A forma encontrada no HISTO é mantida como o ID do evento na saída. Se houver múltiplos blocos compatíveis, o mês coincidente tem prioridade; sem desempate único, a validação falha por ambiguidade.
 
 O novo padrão também aceita marcadores `BP:440826` e `BP: PP440826`. No modo online, os metadados de identificação, execução e fontes do evento permanecem visíveis no resultado da página; a aba `Resumo` contém apenas `Plano`, `Data` e `Hora`. A execução forçada não desativa as validações de estrutura ou temporização.
+
+### ID do plano no site (formato da coluna `Plano`)
+A coluna `Plano` (em `Dados dos Furos` e em `Resumo`) passou a aceitar dois formatos:
+- ID numérico normalizado (`PLANO` sem zeros à esquerda, 6 a 8 dígitos no texto de origem), por exemplo `440726`. Nome do arquivo: `Plano_Fogo_Realizado_PP440726.xlsx`.
+- ID textual, exatamente como digitado (aparado nas extremidades), por exemplo `REG CRISTA F3`, ou derivado do nome do arquivo (`Crista F3`) ou gerado (`PFR_20261027_120056`). Nome do arquivo: `Plano_Fogo_Realizado_<nome sanitizado>.xlsx`, em que o nome sanitizado remove acentos, substitui espaços por `_`, remove caracteres inválidos em nomes de arquivo (`<>:"/\|?*` e controles) e é limitado a `business.plan_label_max_length` caracteres. Quando nada resta, o nome é `Plano_Fogo_Realizado.xlsx`.
+
+A origem do ID é registrada no resultado (`Digitado`, `Anexos ou HISTO`, `Nome do arquivo (automático)`, `Gerado (automático)`). Um ID derivado ou gerado gera aviso. O ID gerado usa `business.plan_label_fallback_prefix`, a data e o horário do disparo já resolvidos, sem usar o relógio do computador.
+
+Quando o texto digitado contém um ID numérico entre outras palavras, o número é usado para localizar o bloco no HISTO e o texto continua sendo a coluna `Plano`. O campo `histoPlanId` do resultado guarda o ID do HISTO quando ele é diferente do ID gravado.
+
+### Cabeçalhos de tabela (site)
+As colunas obrigatórias de `Projeto Completo` e `Config Final` são reconhecidas sem diferenciar caixa, acentos, espaços e separadores, somente quando a variação casa com exatamente uma coluna conhecida e a coluna exata ainda não existe. Cada ajuste gera aviso no resultado, apenas para as tabelas que alimentam o cálculo. Aliases já existentes (ex.: `Angle (º)` → `Angle_deg`) continuam sem aviso.

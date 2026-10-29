@@ -15,6 +15,16 @@ window.PFR_BROWSER_CONFIG = {
     // Importação do BREX (BMO): o relógio do BMO grava em UTC; -3 converte para Brasília.
     brexOffsetHours: -3,
     brexOffsetMinHours: -12,
-    brexOffsetMaxHours: 14
+    brexOffsetMaxHours: 14,
+    // Identificação do plano (espelho de business.plan_label_* e output_name_*).
+    planLabelFallbackPrefix: 'PFR',
+    planLabelMaxLength: 60,
+    planLabelGenericNames: [
+      'pp', 'pdf', 'plano', 'plano de perfuracao', 'plano de fogo', 'plano de fogo realizado',
+      'plano realizado', 'copia', 'modelo', 'historial da bmo', 'projeto completo',
+      'config final', 'configuracao final'
+    ],
+    outputNameTemplate: 'Plano_Fogo_Realizado_PP{plan_id}.xlsx',
+    outputNameTextTemplate: 'Plano_Fogo_Realizado_{plan_label}.xlsx'
   }
 };
