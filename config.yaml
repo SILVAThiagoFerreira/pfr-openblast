@@ -84,6 +84,11 @@ business:
   elevation_plausible_max_m: 5000
   elevation_design_match_tolerance_m: 0.5
   elevation_design_sheet_pattern: "PROJETO PERFURA"
+  # Furo de assinatura (SPEC.md, "Furo de assinatura"): ID (Number do Config Final) cujos valores de entrada
+  # (carga, tampão realizado, tempo de detonação, diâmetro e cota) são preservados exatamente como vieram.
+  # Vazio = sem furo de assinatura (comportamento padrão). Espelhado em public/config.js (signatureHoleId);
+  # tests/test_browser_config.py verifica a igualdade.
+  signature_hole_id: ""
 
 validation:
   required_design_columns:

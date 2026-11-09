@@ -30,6 +30,8 @@ window.PFR_BROWSER_CONFIG = {
     elevationPlausibleMinM: -500,
     elevationPlausibleMaxM: 5000,
     elevationDesignMatchToleranceM: 0.5,
-    elevationDesignSheetPattern: 'PROJETO PERFURA'
+    elevationDesignSheetPattern: 'PROJETO PERFURA',
+    // Furo de assinatura (espelho de business.signature_hole_id; vazio = sem furo de assinatura).
+    signatureHoleId: ''
   }
 };

@@ -18,6 +18,8 @@ SCALAR_KEYS = {
     "elevation_plausible_max_m": "elevationPlausibleMaxM",
     "elevation_design_match_tolerance_m": "elevationDesignMatchToleranceM",
     "elevation_design_sheet_pattern": "elevationDesignSheetPattern",
+    # Furo de assinatura: ID padrão do site (vazio = nenhum furo de assinatura).
+    "signature_hole_id": "signatureHoleId",
 }
 LIST_KEYS = {
     "plan_label_generic_names": "planLabelGenericNames",

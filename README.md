@@ -87,6 +87,11 @@ Configuração (`config.yaml`, espelhada em `public/config.js`):
 
 Formato do arquivo e regras de leitura: `DATA_SCHEMA.md`, seção "Entrada BREX (BMO)".
 
+## Furo de assinatura
+Quando o plano teve um furo de assinatura, marque **Plano teve furo de assinatura?** em **Opções de saída** e informe o ID do furo (como aparece no Config Final; a lista traz os furos depois de anexar o Config Final). Esse furo mantém exatamente os valores de entrada: carga realizada, tampão realizado, tempo de detonação, diâmetro e cota. Os demais furos seguem as regras normais, e o total de carga (quando habilitado) fecha contando a carga desse furo. ID inexistente, repetido ou com tempo de detonação que não pode ser preservado bloqueia a geração com mensagem explícita. Regras: `SPEC.md`, seção "Furo de assinatura".
+
+Configuração (CLI e backend Flask): `business.signature_hole_id` em `config.yaml` (vazio = sem furo de assinatura). Espelhada em `public/config.js` (`signatureHoleId`).
+
 ## Cota (Z)
 O `Z (crest)` e o `Z (toe)` do Excel são cotas (elevação). Quando o `Z` do Config Final não está na faixa de cota configurada (`business.elevation_plausible_min_m`/`max_m`), a cota vem do `Z Collar` do Plano de Perfuração do mesmo `Number`, com X/Y conferidos dentro de `business.elevation_design_match_tolerance_m`. O `Z (toe)` vem do Config Final ou é calculado como `Z (crest) - profundidade realizada * cos(inclinação)`. Furos sem cota ficam em branco e aparecem em aviso com o motivo. Quando nenhum furo tem cota, o aviso "Nenhum furo com cota; Z em branco" é exibido e o Excel é gerado mesmo assim: a ausência de cota nunca bloqueia a geração. Regras em SPEC.md ("Cota (Z) do realizado") e formato em DATA_SCHEMA.md ("Plano de Perfuração (cota)").
 

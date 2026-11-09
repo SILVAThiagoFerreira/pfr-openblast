@@ -43,6 +43,35 @@ Motivo: o `Config Final` exportado em 27/10/2026 (REG CRISTA F3) trazia em `Z` v
 - O Plano de Perfuração é identificado pelas colunas `ID`, `X Collar`, `Y Collar` e `Z Collar`. Se a planilha for encontrada e faltarem colunas, a planilha não é usada como fonte de cota e um aviso informa as colunas faltantes (site e CLI); a execução continua. No site, a leitura de cabeçalhos reconhece variações destas quatro colunas com aviso, como nas demais tabelas.
 - Implementação: `public/elevation.js` (site) e `src/pfr/elevation.py` (CLI); mesma regra e mesmos avisos. Validação da planilha de plano: `src/pfr/validation.py` (`check_design_columns`). Testes: `tests/test_elevation.js` e `tests/test_elevation.py`.
 
+## Furo de assinatura
+Motivo: um plano pode ter um furo de assinatura cujos dados realizados devem permanecer exatamente como foram informados, sem os ajustes automáticos do processamento. Os demais furos seguem as regras atuais.
+
+- Configuração: `business.signature_hole_id` em `config.yaml` (CLI e Flask) — ID do furo (`Number` do Config Final); vazio = sem furo de assinatura (padrão). No site, o bloco "Furo de assinatura" (em "Opções de saída") tem o checkbox "Plano teve furo de assinatura?" e o campo "ID do furo de assinatura", que aceita digitação e oferece os `Number` do Config Final anexado. O valor padrão do site é o espelho `signatureHoleId` em `public/config.js` (vazio).
+- Sem o checkbox marcado (ou com `signature_hole_id` vazio), o resultado é idêntico ao comportamento sem a regra.
+
+Validação (bloqueante, com mensagem explícita; nunca silenciosa):
+- O ID deve conter somente dígitos (`Number` inteiro). Vazio, texto ou decimal é recusado.
+- O ID deve existir no plano processado (Config Final, após `business.include_eliminated`). Ausente: erro.
+- O ID deve aparecer uma única vez no Config Final. Repetido: erro.
+- O tempo de detonação do furo deve ser inteiro, não negativo e único depois do arredondamento. Como o tempo é preservado e não imputado, vazio, negativo, não inteiro ou repetido em outro furo bloqueia com a orientação de corrigir o Config Final.
+- No site, o furo de assinatura não pode ser o furo de menor carga informado no bloco de carga-alvo (a carga dele é preservada).
+
+Preservação (valores do furo de assinatura iguais aos da entrada):
+- `cargas realizadas` = `InputedCharge`: sem redistribuição de carga zerada, sem alvo de carga e sem fechamento de total. Carga zero continua zero.
+- `tampao realizado` = `Stemming` do Config Final: sem variação simulada e sem arredondamento para uma casa decimal.
+- `tempo detonacao (ms)` = `DetonatingTime`: sem imputação de tempo.
+- `diametro` = `Diameter` como veio: sem conversão de metros para polegadas (ver "Pendências" em TASK.md).
+- `Z (crest)` = `Z` do Config Final e `Z (toe)` = `Z_Toe` do Config Final, mesmo quando o `Z` não é cota: sem substituição pelo Plano de Perfuração e sem cálculo pela geometria. Fora da faixa de cota ou sem Z, há aviso explícito.
+- Os demais campos do furo (profundidade, azimute, inclinação, subfuração, previstos, X e Y) já vêm da entrada e não passam por regra de ajuste.
+
+Demais furos:
+- Seguem as regras atuais (carga zerada, alvo de carga, tampão simulado, tempos imputados, diâmetro convertido, cota pelo plano).
+- Com alvo de carga, o total fecha no alvo contando a carga fixa do furo de assinatura; os demais furos absorvem a diferença entre o alvo e essa carga.
+
+Avisos e registro: a CLI registra no log o furo preservado; o site mostra o furo nos detalhes do resultado e o informa no log local de erro. Os avisos de cota do furo aparecem na lista de avisos.
+
+Implementação: `src/pfr/validation.py` (`parse_signature_hole_id`, `validate_signature_hole`), `src/pfr/processing.py` (`build_output_frame`), `src/pfr/elevation.py` (`resolve_elevations`, parâmetro `preserved`); no site, `public/signature-hole.js` (ID e tempo), `public/charge.js` (`distributeCharges` e `redistributeZeroCharges` com `fixedIndexes`), `public/stemming.js` (`applyVariation` com `preservedIndexes`), `public/elevation.js` (`hole.preserved`) e `public/app.js` (`buildRows`). Testes: `tests/test_signature_hole.py`, `tests/test_signature_hole.js`, `tests/test_browser_config.py`, `tests/test_frontend.js`.
+
 ## Validação
 - Verificar existência dos arquivos obrigatórios.
 - Verificar colunas mínimas do projeto e do realizado.

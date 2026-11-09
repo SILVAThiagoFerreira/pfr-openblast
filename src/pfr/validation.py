@@ -1,9 +1,63 @@
+import re
 from pathlib import Path
 
 import pandas as pd
 
 from .io import read_table
 from .models import SourceFiles
+
+
+def parse_signature_hole_id(value) -> int | None:
+    """`business.signature_hole_id`: vazio ou nulo = sem furo de assinatura; senão, o Number do furo (somente dígitos)."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if not re.fullmatch(r"\d+", text):
+        raise ValueError(
+            "O ID do furo de assinatura deve ser o número do furo, como aparece no Config Final (ex.: 245). "
+            f"Valor configurado: \"{text}\"."
+        )
+    return int(text)
+
+
+def validate_signature_hole(merged: pd.DataFrame, cfg: dict) -> pd.Series:
+    """Máscara booleana (mesmo índice de `merged`) marcando o furo de assinatura. Regras em SPEC.md ("Furo de assinatura").
+
+    Bloqueia com mensagem explícita: ID inválido, ID ausente do plano, ID repetido e tempo de detonação
+    do furo que não pode ser preservado (vazio, negativo, não inteiro ou repetido em outro furo).
+    """
+    hole_id = parse_signature_hole_id(cfg.get("business", {}).get("signature_hole_id"))
+    mask = pd.Series(False, index=merged.index, dtype=bool)
+    if hole_id is None:
+        return mask
+
+    numbers = pd.to_numeric(merged["Number"], errors="coerce")
+    positions = [position for position, value in enumerate(numbers.tolist()) if value == hole_id]
+    if not positions:
+        raise ValueError(
+            f"O furo de assinatura {hole_id} não foi encontrado no plano realizado (Config Final). "
+            "Confira o ID; um furo marcado como eliminated só entra no plano quando business.include_eliminated está ativo."
+        )
+    if len(positions) > 1:
+        raise ValueError(f"O ID do furo de assinatura {hole_id} aparece mais de uma vez no Config Final.")
+
+    position = positions[0]
+    times = pd.to_numeric(merged["DetonatingTime"], errors="coerce") if "DetonatingTime" in merged.columns else pd.Series(float("nan"), index=merged.index)
+    raw = float(times.iloc[position])
+    time_message = (
+        f"O furo de assinatura {hole_id} não tem tempo de detonação válido na entrada (vazio, negativo, não inteiro "
+        "ou repetido em outro furo). Como o tempo deve ser preservado como veio da entrada, corrija o Config Final."
+    )
+    if pd.isna(raw) or raw < 0 or not raw.is_integer():
+        raise ValueError(time_message)
+    normalized = times.round(0).where(times >= 0)
+    if int((normalized == raw).sum()) != 1:
+        raise ValueError(time_message)
+
+    mask.iloc[position] = True
+    return mask
 
 
 def validate_columns(df, required: list[str], label: str) -> list[str]:

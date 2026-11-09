@@ -12,6 +12,7 @@ import pandas as pd
 from pypdf import PdfReader
 
 from .io import read_table, read_text
+from .validation import validate_signature_hole
 
 
 def _series_or_na(df: pd.DataFrame, column: str) -> pd.Series:
@@ -111,15 +112,27 @@ def _fill_missing_detonating_time(series: pd.Series, enabled: bool) -> tuple[pd.
     return result, imputed
 
 
-def _apply_stemming_variation(values: pd.Series, numbers: pd.Series, plan_id: str, enabled: bool, max_delta: float) -> tuple[pd.Series, int]:
+def _apply_stemming_variation(
+    values: pd.Series,
+    numbers: pd.Series,
+    plan_id: str,
+    enabled: bool,
+    max_delta: float,
+    preserved: pd.Series | None = None,
+) -> tuple[pd.Series, int]:
     base = pd.to_numeric(values, errors="coerce")
     if not enabled:
         return base, 0
 
+    preserved_flags = (
+        list(preserved.reindex(base.index, fill_value=False).astype(bool))
+        if preserved is not None
+        else [False] * len(base)
+    )
     varied = base.copy()
     count = 0
     for idx, (number, value) in enumerate(zip(pd.to_numeric(numbers, errors="coerce"), base, strict=False)):
-        if pd.isna(value) or pd.isna(number):
+        if pd.isna(value) or pd.isna(number) or preserved_flags[idx]:
             continue
         seed = f"{plan_id}:{int(number)}:stemming"
         digest = hashlib.sha256(seed.encode("utf-8")).digest()
@@ -136,12 +149,19 @@ def _redistribute_zero_charges(
     enabled: bool,
     target_total: float | None,
     minimum_zero_charge: float,
+    preserved: pd.Series | None = None,
 ) -> tuple[pd.Series, int]:
     values = pd.to_numeric(charges, errors="coerce").astype(float)
     if not enabled:
         return values, 0
 
-    zero_mask = values.eq(0)
+    fixed = (
+        preserved.reindex(values.index, fill_value=False).astype(bool)
+        if preserved is not None
+        else pd.Series(False, index=values.index, dtype=bool)
+    )
+    # Furo de assinatura com carga zero permanece zero: não recebe a carga mínima de furos zerados.
+    zero_mask = values.eq(0) & ~fixed
     zero_count = int(zero_mask.sum())
     if zero_count == 0:
         return values, 0
@@ -155,7 +175,7 @@ def _redistribute_zero_charges(
     if target_total <= 0:
         raise ValueError("business.charge_total_target_kg deve ser maior que zero quando houver furos com carga zerada.")
 
-    non_zero_mask = ~zero_mask & values.notna()
+    non_zero_mask = values.notna() & ~values.eq(0)
     if non_zero_mask.sum() < 3:
         raise ValueError("Nao ha furos suficientes para redistribuir a carga preservando o menor e o maior valor.")
 
@@ -166,7 +186,7 @@ def _redistribute_zero_charges(
     redistribution_targets.loc[min_idx] = False
     redistribution_targets.loc[max_idx] = False
 
-    adjustable_mask = non_zero_mask & ~values.index.isin([min_idx, max_idx])
+    adjustable_mask = non_zero_mask & ~values.index.isin([min_idx, max_idx]) & ~fixed
     adjustable_total = float(values[adjustable_mask].sum())
     if adjustable_total <= 0:
         raise ValueError("Nao foi possivel redistribuir a carga sem alterar o menor e o maior valor.")
@@ -265,11 +285,17 @@ def _enforce_charge_total_target(
     charges: pd.Series,
     enabled: bool,
     target_total: float | None,
+    preserved: pd.Series | None = None,
 ) -> tuple[pd.Series, bool]:
     values = pd.to_numeric(charges, errors="coerce").astype(float)
     if not enabled or target_total is None:
         return values, False
 
+    fixed = (
+        preserved.reindex(values.index, fill_value=False).astype(bool)
+        if preserved is not None
+        else pd.Series(False, index=values.index, dtype=bool)
+    )
     valid = values.dropna()
     if valid.empty:
         return values, False
@@ -291,7 +317,7 @@ def _enforce_charge_total_target(
 
     lower_bound = float(ordered.iloc[0])
     upper_bound = float(ordered.iloc[-1])
-    adjustable_mask = values.notna() & ~values.index.isin([min_idx, max_idx])
+    adjustable_mask = values.notna() & ~values.index.isin([min_idx, max_idx]) & ~fixed
     adjustable = values.loc[adjustable_mask]
     if adjustable.empty:
         raise ValueError("Nao ha furos ajustaveis para fechar a carga total preservando os extremos.")
@@ -737,34 +763,62 @@ def merge_frames(project: pd.DataFrame, final: pd.DataFrame, cfg: dict | None = 
     return merged
 
 
-def build_output_frame(merged: pd.DataFrame, plan_id: str, blast_date: str, blast_time: str, cfg: dict) -> pd.DataFrame:
-    diameter = _series_or_na(merged, "Diameter_m")
-    diameter = diameter.where(diameter.isna() | (diameter >= 1), (diameter * 1000 / 25.4))
+def build_output_frame(
+    merged: pd.DataFrame,
+    plan_id: str,
+    blast_date: str,
+    blast_time: str,
+    cfg: dict,
+    signature_mask: pd.Series | None = None,
+) -> pd.DataFrame:
+    # Furo de assinatura (SPEC.md, "Furo de assinatura"): carga, tampão realizado, tempo, diâmetro e cota
+    # são os valores de entrada; nenhuma regra automática de ajuste se aplica a ele.
+    if signature_mask is None:
+        signature_mask = validate_signature_hole(merged, cfg)
+    preserved = signature_mask.reindex(merged.index, fill_value=False).astype(bool)
+
+    diameter_raw = _series_or_na(merged, "Diameter_m")
+    diameter = diameter_raw.where(diameter_raw.isna() | (diameter_raw >= 1), (diameter_raw * 1000 / 25.4))
+    diameter = diameter.where(~preserved, diameter_raw)
+
+    detonating_raw = _series_or_na(merged, "DetonatingTime")
     detonating_time, imputed_count = _fill_missing_detonating_time(
-        _series_or_na(merged, "DetonatingTime"),
+        detonating_raw,
         cfg["business"].get("fill_missing_detonating_time", True),
     )
+    if preserved.any() and (detonating_time[preserved].astype(float) != detonating_raw[preserved].astype(float)).any():
+        raise ValueError("O tempo de detonação do furo de assinatura foi alterado; a entrada deve ser preservada.")
+
+    stemming_raw = _series_or_na(merged, "r_stemming")
     stemming_real, stemming_variation_count = _apply_stemming_variation(
-        _series_or_na(merged, "r_stemming"),
+        stemming_raw,
         _series_or_na(merged, "Number"),
         plan_id,
         cfg["business"].get("simulate_stemming_variation", False),
         float(cfg["business"].get("simulate_stemming_variation_max", 0.12)),
+        preserved,
     )
     stemming_real = pd.to_numeric(stemming_real, errors="coerce").round(1)
+    stemming_real = stemming_real.where(~preserved, stemming_raw)
     merged.attrs["imputed_detonating_time_count"] = imputed_count
     merged.attrs["stemming_variation_count"] = stemming_variation_count
+    merged.attrs["signature_hole_count"] = int(preserved.sum())
+
+    charge_raw = _series_or_na(merged, "r_explosive")
     charge_values, zero_charge_count = _redistribute_zero_charges(
-        _series_or_na(merged, "r_explosive"),
+        charge_raw,
         cfg["business"].get("redistribute_zero_charges", False),
         cfg["business"].get("charge_total_target_kg"),
         float(cfg["business"].get("charge_zero_fill_min_kg", 0.01)),
+        preserved,
     )
     charge_values, charge_total_adjusted = _enforce_charge_total_target(
         charge_values,
         cfg["business"].get("enforce_charge_total_target", False),
         cfg["business"].get("charge_total_target_kg"),
+        preserved,
     )
+    charge_values = charge_values.where(~preserved, charge_raw)
     data = pd.DataFrame(
         {
             "Data": blast_date,

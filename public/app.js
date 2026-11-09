@@ -26,6 +26,11 @@ const manualFireDateError = document.querySelector('#manual-fire-date-error');
 const manualFireTimeInput = document.querySelector('#manual-fire-time');
 const manualFireTimeError = document.querySelector('#manual-fire-time-error');
 const forceButton = document.querySelector('#force-submit');
+const signatureToggle = document.querySelector('#enable-signature-hole');
+const signatureSettings = document.querySelector('#signature-hole-settings');
+const signatureInput = document.querySelector('#signature-hole-id');
+const signatureError = document.querySelector('#signature-hole-error');
+const signatureOptionsList = document.querySelector('#signature-hole-options');
 let attachedFiles = [];
 let chargeSuggestionToken = 0;
 let chargeSuggestionValues = null;
@@ -134,7 +139,8 @@ function makeClientLog(error, options = {}) {
   const fireDate = options.manualFireDate || '-';
   const fireTime = options.manualFireTime || '-';
   const history = options.histoMissing ? 'não anexado' : 'anexado ou não identificado';
-  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nData local informada: ${fireDate}\nHorário local informado: ${fireTime}\nHistorial da BMO: ${history}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
+  const signature = options.signatureHole || '-';
+  return `OPENBLAST - LOG DE ERRO\nData: ${new Date().toISOString()}\nModo: processamento online\nConversão de horário: ${offset}\nIdentificação informada: ${identity}\nData local informada: ${fireDate}\nHorário local informado: ${fireTime}\nHistorial da BMO: ${history}\nFuro de assinatura informado: ${signature}\nExecução forçada: ${options.force ? 'sim' : 'não'}\nArquivos selecionados:\n${files}\n\nErro:\n${error?.stack || error?.message || error}\n`;
 }
 
 function setProgress(value, label) {
@@ -215,6 +221,7 @@ async function refreshChargeMinimumSuggestion() {
   if (!tableFiles.length) {
     clearAutomaticChargeSuggestion();
     setChargeMinimumSuggestionMessage();
+    setSignatureOptions([]);
     return;
   }
 
@@ -223,6 +230,7 @@ async function refreshChargeMinimumSuggestion() {
     parsedTables = await Promise.all(tableFiles.map(async file => ({ file, rows: await readTable(file) })));
   } catch (_error) {
     if (token === chargeSuggestionToken) {
+      setSignatureOptions([]);
       setChargeMinimumSuggestionMessage('A sugestão aparecerá quando o Config Final.csv estiver anexado e legível.');
     }
     return;
@@ -232,9 +240,12 @@ async function refreshChargeMinimumSuggestion() {
   const namedFinal = parsedTables.find(item => /config\s*final/i.test(item.file.name) && hasColumns(item.rows, REQUIRED_FINAL));
   const finalEntry = namedFinal || parsedTables.find(item => hasColumns(item.rows, REQUIRED_FINAL));
   if (!finalEntry) {
+    setSignatureOptions([]);
     setChargeMinimumSuggestionMessage('Anexe o Config Final.csv para preencher a sugestão de carga mínima.');
     return;
   }
+  // Lista de IDs do furo de assinatura: os Number do Config Final (o campo aceita digitação).
+  setSignatureOptions(finalEntry.rows);
 
   const candidates = finalEntry.rows
     .map(row => ({ id: parseNumber(row.Number), charge: parseNumber(row.InputedCharge) }))
@@ -313,6 +324,51 @@ function readChargeTarget() {
   return { enabled: true, target, minimum, minimumHoleId };
 }
 
+// Furo de assinatura (signature-hole.js): o ID é validado aqui; existência e tempo são validados em buildRows.
+function setSignatureError(message = '') {
+  if (!signatureError || !signatureInput) return;
+  signatureError.textContent = message;
+  signatureError.hidden = !message;
+  signatureInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function syncSignatureControls() {
+  const enabled = signatureToggle.checked;
+  signatureSettings.hidden = !enabled;
+  signatureSettings.setAttribute('aria-hidden', String(!enabled));
+  if (!enabled) setSignatureError();
+}
+
+function setSignatureOptions(rows) {
+  if (!signatureOptionsList) return;
+  signatureOptionsList.replaceChildren();
+  const ids = [...new Set(rows.map(row => parseNumber(row.Number)).filter(number => number !== null))].sort((a, b) => a - b);
+  ids.forEach(id => {
+    const option = document.createElement('option');
+    option.value = String(id);
+    signatureOptionsList.append(option);
+  });
+}
+
+function readSignatureHole() {
+  if (!signatureToggle.checked) {
+    setSignatureError();
+    return { enabled: false, holeId: null };
+  }
+  try {
+    const holeId = window.OpenBlastSignatureHole.parseHoleId(signatureInput.value);
+    setSignatureError();
+    return { enabled: true, holeId };
+  } catch (error) {
+    setSignatureError(error.message);
+    throw error;
+  }
+}
+
+function signatureLogValue() {
+  return signatureToggle?.checked ? (signatureInput?.value.trim() || '(vazio)') : '-';
+}
+
 function readTimezoneOffset() {
   const value = timezoneOffset?.value || 'none';
   return value === 'none' ? null : value;
@@ -377,6 +433,14 @@ chargeMinimumHoleInput.addEventListener('input', () => {
   setChargeMinimumHoleError();
 });
 syncChargeTargetControls();
+signatureToggle.addEventListener('change', syncSignatureControls);
+signatureInput.addEventListener('input', () => setSignatureError());
+// Valor inicial vindo de config.js (espelho de business.signature_hole_id); vazio = sem furo de assinatura.
+if (BUSINESS.signatureHoleId) {
+  signatureToggle.checked = true;
+  signatureInput.value = String(BUSINESS.signatureHoleId);
+}
+syncSignatureControls();
 
 function key(value) {
   const number = parseNumber(value);
@@ -506,48 +570,6 @@ function planDocumentNames(files, sources) {
   return [sources.pdf?.name, ...others].filter(Boolean);
 }
 
-async function sha256(bytes) {
-  if (globalThis.crypto?.subtle) return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-  let hash = 2166136261;
-  for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619);
-  return new Uint8Array([hash >>> 24, hash >>> 16, hash >>> 8, hash, hash >>> 16, hash >>> 8, hash >>> 24, hash]);
-}
-
-async function applyStemmingVariation(values, numbers, planId) {
-  if (!BUSINESS.stemmingVariation) return values;
-  const result = values.slice();
-  const encoder = new TextEncoder();
-  for (let index = 0; index < result.length; index += 1) {
-    if (result[index] === null || numbers[index] === null) continue;
-    const digest = await sha256(encoder.encode(`${planId}:${Math.trunc(numbers[index])}:stemming`));
-    const magnitude = (((digest[0] * 0x1000000) + (digest[1] * 0x10000) + (digest[2] * 0x100) + digest[3]) / 0xFFFFFFFF) * BUSINESS.stemmingMaxDelta;
-    const sign = digest[4] % 2 ? 1 : -1;
-    result[index] = Math.max(0, Math.round((result[index] + sign * magnitude) * 100) / 100);
-  }
-  return result.map(value => value === null ? null : Math.round(value * 10) / 10);
-}
-
-function redistributeZeros(values) {
-  const result = values.slice();
-  const zeroIndexes = result.map((value, index) => value === 0 ? index : -1).filter(index => index >= 0);
-  if (!BUSINESS.redistributeZeroCharges || !zeroIndexes.length) return result;
-  const validIndexes = result.map((value, index) => value !== null && value !== 0 ? index : -1).filter(index => index >= 0);
-  if (validIndexes.length < 3) throw new Error('Não há furos suficientes para redistribuir a carga zerada preservando os extremos.');
-  const minIndex = validIndexes.reduce((best, index) => result[index] < result[best] ? index : best, validIndexes[0]);
-  const maxValue = Math.max(...validIndexes.map(index => result[index]));
-  const maxIndexes = validIndexes.filter(index => result[index] === maxValue);
-  const adjustable = validIndexes.filter(index => index !== minIndex && !maxIndexes.includes(index));
-  const zeroAllocation = BUSINESS.zeroChargeMinimum * zeroIndexes.length;
-  const adjustableTotal = adjustable.reduce((sum, index) => sum + result[index], 0);
-  if (!adjustableTotal || zeroAllocation >= BUSINESS.chargeTarget) throw new Error('Não foi possível redistribuir a carga mantendo os extremos.');
-  zeroIndexes.forEach(index => { result[index] = BUSINESS.zeroChargeMinimum; });
-  adjustable.forEach(index => { result[index] -= (result[index] / adjustableTotal) * zeroAllocation; });
-  const remainder = Math.round((values.reduce((sum, value) => sum + (value ?? 0), 0) - result.reduce((sum, value) => sum + (value ?? 0), 0)) * 1000) / 1000;
-  result[adjustable[0]] = Math.round((result[adjustable[0]] + remainder) * 1000) / 1000;
-  if (maxIndexes.some(index => result[index] !== values[index])) throw new Error('A redistribuição alterou indevidamente a maior carga original.');
-  return result;
-}
-
 function findUniqueHoleIndex(rows, holeId) {
   const normalizedId = key(holeId);
   const indexes = rows.map((row, index) => key(row.Number) === normalizedId ? index : -1).filter(index => index >= 0);
@@ -560,7 +582,7 @@ function findUniqueHoleIndex(rows, holeId) {
   return indexes[0];
 }
 
-function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows = []) {
+function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows = [], signatureOptions = {}) {
   const projects = new Map(projectRows.map(row => [key(row.Number), row]));
   const mergedCandidates = finalRows.map(row => ({ ...(projects.get(key(row.Number)) || {}), ...row }));
   const merged = (BUSINESS.includeEliminated
@@ -568,11 +590,21 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
     : mergedCandidates.filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0))
     .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
   const numbers = merged.map(row => parseNumber(row.Number));
+  // Furo de assinatura (SPEC.md, "Furo de assinatura"): carga, tampão realizado, tempo, diâmetro e cota
+  // ficam como vieram da entrada. ID ausente/repetido e tempo inválido bloqueiam com mensagem explícita.
+  const signatureIndex = signatureOptions.enabled
+    ? window.OpenBlastSignatureHole.findHoleIndex(numbers, signatureOptions.holeId)
+    : -1;
+  const preserved = new Set(signatureIndex >= 0 ? [signatureIndex] : []);
+  const fixedIndexes = [...preserved];
+  const rawTimes = merged.map(row => parseNumber(row.DetonatingTime));
+  if (signatureIndex >= 0) window.OpenBlastSignatureHole.validateTime(rawTimes, signatureIndex, numbers[signatureIndex]);
   // Cota (Z): regra em elevation.js. Furo sem cota fica em branco e entra em aviso (sem erro silencioso).
   const elevation = window.OpenBlastElevation.resolveElevations(
     merged.map((row, index) => ({
       number: numbers[index], x: parseNumber(row.X), y: parseNumber(row.Y), z: parseNumber(row.Z),
-      zToe: parseNumber(row.Z_Toe), length: parseNumber(row.Length), angle: parseNumber(row.Angle)
+      zToe: parseNumber(row.Z_Toe), length: parseNumber(row.Length), angle: parseNumber(row.Angle),
+      preserved: preserved.has(index)
     })),
     designRows.map(row => ({
       number: parseNumber(row.ID), x: parseNumber(row['X Collar']), y: parseNumber(row['Y Collar']), z: parseNumber(row['Z Collar'])
@@ -582,9 +614,17 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
       matchToleranceM: BUSINESS.elevationDesignMatchToleranceM
     }
   );
-  const times = window.OpenBlastTiming.fillMissingTimes(merged.map(row => parseNumber(row.DetonatingTime))).values;
+  const times = window.OpenBlastTiming.fillMissingTimes(rawTimes).values;
+  if (signatureIndex >= 0 && times[signatureIndex] !== rawTimes[signatureIndex]) {
+    throw new Error('O tempo de detonação do furo de assinatura foi alterado; a entrada deve ser preservada.');
+  }
   const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
-  const baseCharges = redistributeZeros(rawCharges);
+  const baseCharges = window.OpenBlastCharge.redistributeZeroCharges(rawCharges, {
+    enabled: BUSINESS.redistributeZeroCharges,
+    zeroChargeMinimum: BUSINESS.zeroChargeMinimum,
+    chargeTarget: BUSINESS.chargeTarget,
+    fixedIndexes
+  });
   const positiveIndexes = rawCharges.map((value, index) => value !== null && value > 0 ? index : -1).filter(index => index >= 0);
   let chargeOptionsWithExtremes = chargeOptions;
   let chargeMetadata = null;
@@ -593,6 +633,11 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
       throw new Error('São necessários pelo menos dois furos com carga positiva na planilha para preservar a maior carga.');
     }
     const minimumIndex = findUniqueHoleIndex(merged, chargeOptions.minimumHoleId);
+    if (minimumIndex === signatureIndex) {
+      const conflict = new Error('O furo de assinatura não pode ser o furo de menor carga: a carga dele é preservada como veio da entrada.');
+      conflict.code = 'SIGNATURE_HOLE_CONFLICT';
+      throw conflict;
+    }
     const maximumIndex = positiveIndexes.reduce((best, index) => rawCharges[index] > rawCharges[best] ? index : best, positiveIndexes[0]);
     const maximumValue = rawCharges[maximumIndex];
     const maximumIndexes = positiveIndexes.filter(index => rawCharges[index] === maximumValue);
@@ -605,18 +650,30 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
       minimumValue: chargeOptions.minimum,
       maximumIndex,
       maximumValue,
-      maximumIndexes
+      maximumIndexes,
+      fixedIndexes
     };
     chargeMetadata = { minimumHoleId: numbers[minimumIndex], maximumHoleId: numbers[maximumIndex], maximumValue };
   }
   const charges = chargeOptions.enabled
     ? window.OpenBlastCharge.distributeCharges(baseCharges, chargeOptions.target, chargeOptionsWithExtremes)
     : baseCharges;
-  const stemming = applyStemmingVariation(merged.map(row => parseNumber(row.Stemming)), numbers, event.planId);
+  if (signatureIndex >= 0 && charges[signatureIndex] !== rawCharges[signatureIndex]) {
+    throw new Error('A carga do furo de assinatura foi alterada; a entrada deve ser preservada.');
+  }
+  const stemming = window.OpenBlastStemming.applyVariation(
+    merged.map(row => parseNumber(row.Stemming)),
+    numbers,
+    event.planId,
+    { enabled: BUSINESS.stemmingVariation, maxDelta: BUSINESS.stemmingMaxDelta, preservedIndexes: fixedIndexes }
+  );
   return stemming.then(stemmingValues => {
     const data = merged.map((row, index) => {
       const diameterRaw = parseNumber(row.Diameter);
-      const diameter = diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw;
+      // Diâmetro do furo de assinatura: valor de entrada, sem a conversão de metros para polegadas.
+      const diameter = preserved.has(index)
+        ? diameterRaw
+        : (diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw);
       return {
         Data: event.date, Horario: event.time, Plano: event.planId, Tipo: BUSINESS.type, id: numbers[index],
         y: parseNumber(row.Y), x: parseNumber(row.X),
@@ -633,7 +690,8 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
       chargeMetadata,
       sourceFinalRows: finalRows.length,
       excludedRows: mergedCandidates.length - merged.length,
-      elevationWarnings: elevation.warnings
+      elevationWarnings: elevation.warnings,
+      signatureHoleId: signatureIndex >= 0 ? numbers[signatureIndex] : null
     };
   });
 }
@@ -671,7 +729,7 @@ function buildWorkbook(data, event) {
   return workbook;
 }
 
-async function generateLocally(files, chargeOptions = {}, timeOptions = {}, planOptions = {}) {
+async function generateLocally(files, chargeOptions = {}, timeOptions = {}, planOptions = {}, signatureOptions = {}) {
   if (typeof XLSX === 'undefined') throw new Error('A biblioteca local de Excel não carregou. Recarregue a página e tente novamente.');
   if (files.length > 20) throw new Error('Envie no máximo 20 arquivos por execução.');
   const totalBytes = files.reduce((total, file) => total + file.size, 0);
@@ -738,7 +796,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   const outputName = window.OpenBlastPlanLabel.outputFileName(event.planId, PLAN_LABEL_CONFIG);
   const warnings = [...(sources.warnings || []), ...identity.warnings, ...outputName.warnings];
   setProgress(62, 'Montando os dados dos furos...');
-  const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions, sources.designRows);
+  const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions, sources.designRows, signatureOptions);
   warnings.push(...builtRows.elevationWarnings);
   const data = builtRows.data;
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
@@ -757,7 +815,8 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
     excludedRows: builtRows.excludedRows,
     chargeTargetApplied: Boolean(chargeOptions.enabled), chargeTarget: chargeOptions.target,
     chargeMinimum: chargeSummary?.minimum, chargeMinimumHoleId: chargeSummary?.minimumHoleId,
-    chargeMaximum: chargeSummary?.maximum, chargeMaximumHoleId: chargeSummary?.maximumHoleId
+    chargeMaximum: chargeSummary?.maximum, chargeMaximumHoleId: chargeSummary?.maximumHoleId,
+    signatureHoleId: builtRows.signatureHoleId
   };
 }
 
@@ -783,7 +842,8 @@ async function runGeneration(force = false) {
     generationOptions.manualFireTime = readManualFireTime();
     await refreshChargeMinimumSuggestion();
     const chargeOptions = readChargeTarget();
-    const generated = await generateLocally(attachedFiles, chargeOptions, { timezoneOffset: readTimezoneOffset() }, generationOptions);
+    const signatureHole = readSignatureHole();
+    const generated = await generateLocally(attachedFiles, chargeOptions, { timezoneOffset: readTimezoneOffset() }, generationOptions, signatureHole);
     setProgress(88, 'Gerando o arquivo Excel...');
     const filename = generated.fileName;
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
@@ -809,6 +869,11 @@ async function runGeneration(force = false) {
         : 'A execução foi forçada com o identificador informado. As validações de estrutura, furos e temporização foram mantidas.';
       result.append(forceNote);
     }
+    if (generated.signatureHoleId !== null && generated.signatureHoleId !== undefined) {
+      const signatureNote = document.createElement('p');
+      signatureNote.textContent = `Furo de assinatura ${generated.signatureHoleId}: carga, tampão realizado, tempo de detonação, diâmetro e cota foram mantidos como vieram da entrada. Os demais furos seguiram as regras normais.`;
+      result.append(signatureNote);
+    }
     if (generated.chargeTargetApplied) {
       const targetNote = document.createElement('p');
       targetNote.textContent = `Distribuição concluída em todo o plano: total de ${formatKg(generated.chargeTarget)} kg, mínimo de ${formatKg(generated.chargeMinimum)} kg no furo ${generated.chargeMinimumHoleId} e máximo de ${formatKg(generated.chargeMaximum)} kg preservado no furo ${generated.chargeMaximumHoleId}.`;
@@ -833,6 +898,7 @@ async function runGeneration(force = false) {
     metricsData.push(['Historial da BMO', generated.event.historySource === 'missing' ? 'Não anexado (forçada)' : 'Anexado']);
     metricsData.push(['Fonte do horário', generated.event.timeSource === 'force-default' ? 'Fallback forçado (12:00:00)' : generated.event.timeSource === 'manual' ? 'Informado pelo usuário' : 'HISTO']);
     metricsData.push(['Execução', generated.event.forced ? 'Forçada' : 'Automática']);
+    if (generated.signatureHoleId !== null && generated.signatureHoleId !== undefined) metricsData.push(['Furo de assinatura', generated.signatureHoleId]);
     if (generated.event.planIdentity) metricsData.push(['ID / nome informado', generated.event.planIdentity]);
     if (generated.event.histoPlanId) metricsData.push(['ID no HISTO', generated.event.histoPlanId]);
     if (generated.chargeTargetApplied) {
@@ -849,6 +915,10 @@ async function runGeneration(force = false) {
     const title = document.createElement('h3'); title.textContent = 'Não foi possível gerar o plano';
     const message = document.createElement('p'); message.textContent = error.message || String(error);
     result.append(title, message);
+    if (String(error.code || '').startsWith('SIGNATURE_HOLE')) {
+      setSignatureError(error.message);
+      signatureInput?.focus();
+    }
     if (error.code === 'MISSING_FIRE_TIME') {
       const missingHistory = error.histoMissing || /Historial da BMO não foi anexado/i.test(error.message || '');
       setManualFireTimeError(missingHistory
@@ -877,7 +947,7 @@ async function runGeneration(force = false) {
       hint.textContent = 'Se a divergência for apenas o mês do ID, informe o plano acima e use o botão “Forçar execução”.';
       result.append(hint);
     }
-    addLogDownload(result, makeClientLog(error, { force, planIdentity, manualFireDate: manualFireDateInput?.value.trim() || '', manualFireTime: manualFireTimeInput?.value.trim() || '', histoMissing: error.histoMissing ?? generationOptions.histoMissing })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
+    addLogDownload(result, makeClientLog(error, { force, planIdentity, manualFireDate: manualFireDateInput?.value.trim() || '', manualFireTime: manualFireTimeInput?.value.trim() || '', histoMissing: error.histoMissing ?? generationOptions.histoMissing, signatureHole: signatureLogValue() })); statusText.textContent = 'Falha na validação local'; setProgress(100, 'A validação foi interrompida. Consulte o erro abaixo.');
   } finally { result.hidden = false; button.disabled = false; syncActionControls(); statusBox.classList.remove('busy'); result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 

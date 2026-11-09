@@ -131,9 +131,28 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /PLAN_LABEL_CONFIG/);
   assert.match(fs.readFileSync(path.join(root, 'brex-import.js'), 'utf8'), /OpenBlastBrexImport = \{[\s\S]*importFiles/);
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.result-warnings/);
+  // Furo de assinatura: checkbox, ID com lista de furos do Config Final (aceita digitação) e erro explícito.
+  assert.match(html, /<fieldset class="signature-hole">/);
+  assert.match(html, /id="enable-signature-hole"[^>]*type="checkbox"/);
+  assert.match(html, /Plano teve furo de assinatura\?/);
+  assert.match(html, /id="signature-hole-id"[^>]*list="signature-hole-options"/);
+  assert.match(html, /<datalist id="signature-hole-options">/);
+  assert.match(html, /id="signature-hole-error"[^>]*role="alert"/);
+  assert.match(html, /src="\.\/charge\.js\?[^"]*"[\s\S]*src="\.\/elevation\.js\?[^"]*"[\s\S]*src="\.\/signature-hole\.js\?[^"]*"[\s\S]*src="\.\/stemming\.js\?[^"]*"[\s\S]*src="\.\/app\.js\?/);
+  assert.match(app, /readSignatureHole\(\)/);
+  assert.match(app, /OpenBlastSignatureHole\.findHoleIndex/);
+  assert.match(app, /OpenBlastSignatureHole\.validateTime/);
+  assert.match(app, /OpenBlastStemming\.applyVariation/);
+  assert.match(app, /OpenBlastCharge\.redistributeZeroCharges/);
+  assert.match(app, /SIGNATURE_HOLE/);
+  assert.match(app, /Furo de assinatura \$\{generated\.signatureHoleId\}/);
+  assert.match(app, /signatureHoleId: builtRows\.signatureHoleId/);
+  assert.match(fs.readFileSync(path.join(root, 'elevation.js'), 'utf8'), /hole\.preserved/);
+  assert.match(fs.readFileSync(path.join(root, 'charge.js'), 'utf8'), /fixedIndexes/);
+  assert.match(fs.readFileSync(path.join(root, 'force-execution.css'), 'utf8'), /\.signature-hole__toggle/);
 }
 
-for (const file of ['index.html', 'app.js', 'config.js', 'elevation.js', 'plan-id.js', 'plan-label.js', 'table-headers.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js', 'brex.js', 'brex-import.js', 'brex-import.css']) {
+for (const file of ['index.html', 'app.js', 'config.js', 'elevation.js', 'plan-id.js', 'plan-label.js', 'table-headers.js', 'timezone.js', 'timing.js', 'force-execution.css', 'styles.css', 'charge.js', 'brex.js', 'brex-import.js', 'brex-import.css', 'signature-hole.js', 'stemming.js']) {
   assert.equal(fs.readFileSync(path.join(publicRoot, file), 'utf8'), fs.readFileSync(path.join(docsRoot, file), 'utf8'), `${file} must stay in sync`);
 }
 

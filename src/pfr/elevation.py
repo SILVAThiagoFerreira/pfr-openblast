@@ -7,6 +7,8 @@
   Senão, Z (crest) - r_length * cos(r_angle), com aviso.
 - Nenhum furo com cota: não bloqueia. Z (crest) e Z (toe) ficam em branco e o aviso
   "Nenhum furo com cota; Z em branco" é o primeiro da lista.
+- Furo de assinatura (`preserved`): Z (crest) e Z (toe) são os valores do Config Final como vieram, sem
+  consulta ao plano, sem cálculo pela geometria e sem bloqueio mesmo fora da faixa de cota (com aviso).
 """
 from __future__ import annotations
 
@@ -24,13 +26,23 @@ def _fmt(value: float) -> str:
     return f"{value:.3f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
-def resolve_elevations(merged: pd.DataFrame, design: pd.DataFrame | None, cfg: dict) -> tuple[pd.DataFrame, list[str]]:
+def resolve_elevations(
+    merged: pd.DataFrame,
+    design: pd.DataFrame | None,
+    cfg: dict,
+    preserved: pd.Series | None = None,
+) -> tuple[pd.DataFrame, list[str]]:
     business = cfg["business"]
     low = float(business["elevation_plausible_min_m"])
     high = float(business["elevation_plausible_max_m"])
     tolerance = float(business["elevation_design_match_tolerance_m"])
 
     result = merged.copy()
+    keep = (
+        preserved.reindex(result.index, fill_value=False).astype(bool)
+        if preserved is not None
+        else pd.Series(False, index=result.index, dtype=bool)
+    )
     numbers = _numeric(result, "Number")
     x = _numeric(result, "X")
     y = _numeric(result, "Y")
@@ -61,20 +73,36 @@ def resolve_elevations(merged: pd.DataFrame, design: pd.DataFrame | None, cfg: d
 
     distance = np.hypot(x - plan_x, y - plan_y)
     final_valid = z_final.between(low, high)
-    design_valid = plan_z.between(low, high) & (distance <= tolerance)
-    crest = z_final.where(final_valid, plan_z.where(design_valid))
-    crest_source = pd.Series(np.where(final_valid, "final", np.where(design_valid, "design", "")), index=result.index)
+    design_valid = plan_z.between(low, high) & (distance <= tolerance) & ~keep
+    crest = z_final.where(final_valid | keep, plan_z.where(design_valid))
+    crest_source = pd.Series(
+        np.where(keep, "signature", np.where(final_valid, "final", np.where(design_valid, "design", ""))),
+        index=result.index,
+    )
 
     toe_from_final = (crest_source == "final") & z_toe_final.between(low, high)
-    toe_computed = ~toe_from_final & crest.notna() & length.notna() & angle.notna()
+    toe_computed = ~toe_from_final & crest.notna() & length.notna() & angle.notna() & ~keep
     computed = crest - length * np.cos(np.radians(angle))
-    toe = z_toe_final.where(toe_from_final, computed).where(toe_from_final | toe_computed)
+    toe = z_toe_final.where(toe_from_final | keep, computed).where(toe_from_final | toe_computed | keep)
 
     result["Z"] = crest
     result["Z_Toe"] = toe
 
     warnings: list[str] = []
-    invalid_final = z_final.notna() & ~final_valid
+    for index in result.index[keep]:
+        number = int(numbers.loc[index]) if not pd.isna(numbers.loc[index]) else "?"
+        value = z_final.loc[index]
+        if pd.isna(value):
+            warnings.append(
+                f"Furo de assinatura {number}: sem Z no Config Final; Z (crest) e Z (toe) ficam em branco, como na entrada."
+            )
+        elif not final_valid.loc[index]:
+            warnings.append(
+                f"Furo de assinatura {number}: Z (crest) = {_fmt(value)} mantido como veio do Config Final, "
+                f"embora fora da faixa de cota ({low:g} a {high:g} m)."
+            )
+
+    invalid_final = z_final.notna() & ~final_valid & ~keep
     if invalid_final.any():
         examples = "; ".join(
             f"{int(number)} = {_fmt(value)}"
@@ -92,7 +120,7 @@ def resolve_elevations(merged: pd.DataFrame, design: pd.DataFrame | None, cfg: d
             f"(tolerância de {_fmt(tolerance)} m)."
         )
 
-    missing_rows = crest.isna()
+    missing_rows = crest.isna() & ~keep
     if missing_rows.any():
         items = []
         for index in result.index[missing_rows]:

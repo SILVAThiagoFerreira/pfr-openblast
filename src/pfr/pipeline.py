@@ -14,7 +14,7 @@ from .export import export_workbook
 from .io import backup_inputs, read_design_table
 from .models import RunResult
 from .processing import build_output_frame, build_summary, extract_blast_datetime, extract_plan_id, load_final_frame, load_project_frame, merge_frames
-from .validation import check_design_columns, validate_output, validate_sources
+from .validation import check_design_columns, validate_output, validate_signature_hole, validate_sources
 
 
 def configure_logging(cfg: dict) -> logging.Logger:
@@ -73,16 +73,17 @@ def run(
     project = load_project_frame(sources.project)
     final = load_final_frame(sources.final)
     merged = merge_frames(project, final, cfg)
+    signature_mask = validate_signature_hole(merged, cfg)
     design = None
     design_warnings: list[str] = []
     if sources.design:
         design_table = read_design_table(sources.design, cfg["business"]["elevation_design_sheet_pattern"])
         design_warnings = check_design_columns(design_table, cfg["validation"]["required_design_columns"], sources.design.name)
         design = None if design_warnings else design_table
-    merged, elevation_warnings = resolve_elevations(merged, design, cfg)
+    merged, elevation_warnings = resolve_elevations(merged, design, cfg, preserved=signature_mask)
     for message in [*design_warnings, *elevation_warnings]:
         logger.warning("Cota (Z): %s", message)
-    data = build_output_frame(merged, plan_id, blast_date, blast_time, cfg)
+    data = build_output_frame(merged, plan_id, blast_date, blast_time, cfg, signature_mask=signature_mask)
     if bool(cfg["business"].get("include_eliminated", True)) and len(data) != len(final):
         raise ValueError(
             "A quantidade de furos exportados divergiu do Config Final: "
@@ -102,6 +103,11 @@ def run(
         logger.info("Variação de tampao aplicada em %s furos", merged.attrs["stemming_variation_count"])
     if merged.attrs.get("charge_total_adjusted", False):
         logger.info("Carga total ajustada para %s kg preservando os extremos", cfg["business"].get("charge_total_target_kg"))
+    if merged.attrs.get("signature_hole_count", 0):
+        logger.info(
+            "Furo de assinatura %s preservado: carga, tampao realizado, tempo, diametro e cota mantidos como na entrada",
+            cfg["business"].get("signature_hole_id"),
+        )
     summary = build_summary(plan_id, blast_date, blast_time)
 
     output_name = cfg["business"]["output_name_template"].format(plan_id=plan_id)

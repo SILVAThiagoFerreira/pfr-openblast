@@ -7,8 +7,10 @@
   //    Senão, Z (crest) - profundidade realizada * cos(inclinação), com aviso.
   //  - Nenhum furo com cota: não bloqueia. Z (crest) e Z (toe) ficam em branco e o aviso
   //    "Nenhum furo com cota; Z em branco" aparece no topo da lista de avisos.
+  //  - Furo de assinatura (hole.preserved): Z (crest) e Z (toe) são os valores do Config Final como vieram,
+  //    sem consulta ao plano nem cálculo pela geometria, e sem bloqueio mesmo fora da faixa (aviso).
   // config: { minM, maxM, matchToleranceM } (espelho de business.elevation_* em config.yaml).
-  // holes: [{ number, x, y, z, zToe, length, angle }] e designRows: [{ number, x, y, z }], valores numéricos ou null.
+  // holes: [{ number, x, y, z, zToe, length, angle, preserved }] e designRows: [{ number, x, y, z }], valores numéricos ou null.
 
   function isPlausibleElevation(value, config) {
     return Number.isFinite(value) && value >= config.minM && value <= config.maxM;
@@ -23,9 +25,22 @@
     const byNumber = new Map();
     const invalidFinal = [];
     const missing = [];
-    const counts = { final: 0, design: 0, toeFinal: 0, toeComputed: 0, toeMissing: 0 };
+    const preservedInvalid = [];
+    const preservedBlank = [];
+    const counts = { final: 0, design: 0, signature: 0, toeFinal: 0, toeComputed: 0, toeMissing: 0 };
 
     for (const hole of holes) {
+      if (hole.preserved) {
+        // Furo de assinatura: Z e Z_Toe do Config Final como vieram (SPEC.md, "Furo de assinatura").
+        byNumber.set(hole.number, { zCrest: hole.z, zToe: hole.zToe, crestSource: 'signature', toeSource: 'signature' });
+        if (hole.z === null) {
+          preservedBlank.push(hole.number);
+        } else {
+          counts.signature += 1;
+          if (!isPlausibleElevation(hole.z, config)) preservedInvalid.push(hole);
+        }
+        continue;
+      }
       const finalValid = isPlausibleElevation(hole.z, config);
       if (hole.z !== null && !finalValid) invalidFinal.push(hole);
       let zCrest = null;
@@ -74,7 +89,7 @@
       byNumber.set(hole.number, { zCrest, zToe, crestSource, toeSource });
     }
 
-    const resolved = counts.final + counts.design;
+    const resolved = counts.final + counts.design + counts.signature;
 
     const warnings = [];
     if (holes.length && resolved === 0) {
@@ -82,6 +97,15 @@
         'Nenhum furo com cota; Z em branco. O Z do Config Final não é cota (faixa de ' + config.minM + ' a ' + config.maxM + ' m) ' +
         'e nenhum Z Collar do Plano de Perfuração foi conferido (X/Y dentro de ' + `${roundForMessage(config.matchToleranceM)} m).`
       );
+    }
+    for (const hole of preservedInvalid) {
+      warnings.push(
+        `Furo de assinatura ${hole.number}: Z (crest) = ${roundForMessage(hole.z)} mantido como veio do Config Final, ` +
+        `embora fora da faixa de cota (${config.minM} a ${config.maxM} m).`
+      );
+    }
+    for (const number of preservedBlank) {
+      warnings.push(`Furo de assinatura ${number}: sem Z no Config Final; Z (crest) e Z (toe) ficam em branco, como na entrada.`);
     }
     if (invalidFinal.length) {
       const examples = invalidFinal.slice(0, 3).map(hole => `${hole.number} = ${roundForMessage(hole.z)}`).join('; ');

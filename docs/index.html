@@ -7,7 +7,7 @@
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
   <link rel="stylesheet" href="./styles.css?v=20261029-plan-label">
-  <link rel="stylesheet" href="./force-execution.css?v=20260917-charge-minimum">
+  <link rel="stylesheet" href="./force-execution.css?v=20261109-signature">
   <link rel="stylesheet" href="./brex-import.css?v=20261029-brex">
 </head>
 <body>
@@ -186,6 +186,21 @@
                 <p class="charge-target__preserved"><strong>Máximo preservado:</strong> a maior carga já registrada na planilha será mantida exatamente; não é necessário informá-la.</p>
               </div>
             </fieldset>
+
+            <fieldset class="signature-hole">
+              <legend>Furo de assinatura</legend>
+              <label class="signature-hole__toggle" for="enable-signature-hole">
+                <input id="enable-signature-hole" type="checkbox" aria-controls="signature-hole-settings">
+                <span>Plano teve furo de assinatura?</span>
+              </label>
+              <div id="signature-hole-settings" class="signature-hole__settings" hidden>
+                <label for="signature-hole-id">ID do furo de assinatura</label>
+                <input id="signature-hole-id" name="signatureHoleId" type="text" inputmode="numeric" list="signature-hole-options" autocomplete="off" placeholder="Escolha ou digite, ex.: 245" aria-describedby="signature-hole-help signature-hole-error">
+                <datalist id="signature-hole-options"></datalist>
+                <p id="signature-hole-error" class="field-error" role="alert" hidden></p>
+                <p id="signature-hole-help" class="field-help">Use o número do furo como aparece no Config Final; a lista traz os furos do plano depois de anexar o Config Final. Carga, tampão realizado, tempo de detonação, diâmetro e cota desse furo são mantidos exatamente como vieram da entrada. Os demais furos seguem as regras normais.</p>
+              </div>
+            </fieldset>
           </div>
         </details>
       </section>
@@ -228,16 +243,18 @@
 
   <footer>OpenBlast · Plano de Fogo Realizado <span id="year"></span></footer>
   <script src="./vendor/xlsx.full.min.js"></script>
-  <script src="./config.js?v=20261029-elevation"></script>
+  <script src="./config.js?v=20261109-signature"></script>
   <script src="./plan-id.js?v=20261029-plan-label"></script>
   <script src="./plan-label.js?v=20261029-plan-label"></script>
   <script src="./table-headers.js?v=20261029-plan-label"></script>
   <script src="./timing.js?v=20260720-carga-alvo"></script>
-  <script src="./charge.js?v=20260917-charge-minimum"></script>
+  <script src="./charge.js?v=20261109-signature"></script>
   <script src="./timezone.js?v=20260812"></script>
   <script src="./brex.js?v=20261029-brex"></script>
   <script src="./brex-import.js?v=20261109-brex-auto"></script>
-  <script src="./elevation.js?v=20261029-elevation-blank"></script>
-  <script src="./app.js?v=20261029-elevation"></script>
+  <script src="./elevation.js?v=20261109-signature"></script>
+  <script src="./signature-hole.js?v=20261109-signature"></script>
+  <script src="./stemming.js?v=20261109-signature"></script>
+  <script src="./app.js?v=20261109-signature-2"></script>
 </body>
 </html>

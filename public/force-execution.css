@@ -57,6 +57,31 @@
 
 .charge-target__preserved strong { color: var(--gray); }
 
+/* Furo de assinatura: opção em linha inteira, abaixo da distribuição de carga. */
+.signature-hole { grid-column: 1 / -1; }
+
+.signature-hole__toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.signature-hole__toggle input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--red);
+}
+
+.signature-hole__settings {
+  max-width: 470px;
+  margin-top: 13px;
+}
+
+.signature-hole__settings > .field-help { margin-top: 11px; }
+
 .force-hint {
   color: #7d2026;
   font-weight: 700;
