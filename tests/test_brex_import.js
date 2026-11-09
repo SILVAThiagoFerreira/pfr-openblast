@@ -18,12 +18,13 @@ const document = {
   createElement() { return new Element(); }
 };
 const detonation = { id: '1', planIds: [], displayName: 'Teste', bmoSerial: 1, fileName: 'teste.brex' };
+let events = [detonation];
 const window = {
   PFR_BROWSER_CONFIG: { business: { brexOffsetHours: -3, brexOffsetMinHours: -12, brexOffsetMaxHours: 14 } },
   OpenBlastBrex: {
-    parseBrex: () => ({ fileName: 'teste.brex', warnings: [], detonations: [detonation] }),
+    parseBrex: () => ({ fileName: 'teste.brex', warnings: [], detonations: events }),
     parseOffsetHours: value => Number(value),
-    rankDetonations: (_, { offsetHours }) => [{ detonation, adjusted: offsetHours === -3 ? { dateIso: '2026-10-26', date: '26/10/2026', time: '23:30:00' } : { dateIso: '2026-10-27', date: '27/10/2026', time: '02:30:00' }, score: 0 }],
+    rankDetonations: (shots, { offsetHours }) => shots.map(detonation => ({ detonation, adjusted: offsetHours === -3 ? { dateIso: '2026-10-26', date: '26/10/2026', time: '23:30:00' } : { dateIso: '2026-10-27', date: '27/10/2026', time: '02:30:00' }, score: 0 })),
     eventLabel: () => 'Teste'
   }
 };
@@ -31,7 +32,6 @@ vm.runInNewContext(fs.readFileSync('public/brex-import.js', 'utf8'), { window, d
 (async () => {
   await window.OpenBlastBrexImport.importFiles([{ name: 'teste.brex', arrayBuffer: async () => new TextEncoder().encode('xml').buffer }]);
   const date = elements.get('#manual-fire-date'), time = elements.get('#manual-fire-time'), offset = elements.get('#brex-offset-hours');
-  elements.get('#brex-list').children[0].children[0].dispatch('click');
   assert.equal(date.value, '2026-10-26');
   assert.equal(time.value, '23:30:00');
   offset.value = '0'; offset.dispatch('input');
@@ -45,5 +45,16 @@ vm.runInNewContext(fs.readFileSync('public/brex-import.js', 'utf8'), { window, d
   elements.get('#brex-list').children[0].children[0].dispatch('click');
   assert.equal(date.value, '2026-10-26');
   assert.equal(time.value, '23:30:00');
+  date.value = '2026-10-20'; time.value = '10:00:00';
+  await window.OpenBlastBrexImport.importFiles([{ name: 'teste.brex', arrayBuffer: async () => new TextEncoder().encode('xml').buffer }]);
+  assert.equal(date.value, '2026-10-20');
+  assert.equal(time.value, '10:00:00');
+  assert.match(elements.get('#brex-status').textContent, /horário informado/);
+  date.value = ''; time.value = '';
+  events = [detonation, { ...detonation, id: '2' }];
+  await window.OpenBlastBrexImport.importFiles([{ name: 'teste.brex', arrayBuffer: async () => new TextEncoder().encode('xml').buffer }]);
+  assert.equal(date.value, '');
+  assert.equal(time.value, '');
+  assert.equal(elements.get('#brex-list').children.length, 2);
   console.log('BREX date selection and user edits: ok');
 })().catch(error => { console.error(error); process.exitCode = 1; });

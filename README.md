@@ -116,3 +116,5 @@ No novo HISTO, os marcadores `BP:440826` e `BP: PP440826` são reconhecidos. Se 
 
 ## Anexos no modo online
 Os arquivos podem ser adicionados em várias seleções ou arrastados em momentos diferentes. A lista mantém os anexos já carregados, permite remover cada item individualmente e só então iniciar a validação. A identificação do plano usa também os IDs encontrados nas tabelas e no nome dos arquivos, comparando plano e ano com o HISTO após normalizar zeros à esquerda e separadores comuns, sem bloquear por mês diferente.
+
+Ao escolher ou arrastar um BREX junto aos demais arquivos, o navegador o lê automaticamente. Se houver um único disparo, a data e o horário locais preenchem os campos vazios; valores já informados são preservados. Com mais de um disparo, o usuário escolhe o evento na lista. A escolha manual permanece disponível e pode substituir os valores.

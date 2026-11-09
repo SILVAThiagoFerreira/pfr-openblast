@@ -37,3 +37,5 @@
 
 ### Modo online incremental
 As seleções sucessivas são acumuladas em memória, com deduplicação por nome, tamanho e data de modificação. A remoção atualiza imediatamente o conjunto submetido. Antes de escolher o evento do HISTO, o pipeline coleta IDs candidatos dos nomes e das primeiras linhas das tabelas e cruza-os com o bloco de plano usando a composição `PLANO;MÊS;ANO`: zeros à esquerda e separadores são normalizados, o ano é preservado e o mês não impede a associação.
+
+Ao escolher ou arrastar um BREX junto aos demais arquivos, o navegador o lê automaticamente. Se houver um único disparo, a data e o horário locais preenchem os campos vazios; valores já informados são preservados. Com mais de um disparo, o usuário escolhe o evento na lista. A escolha manual permanece disponível e pode substituir os valores.

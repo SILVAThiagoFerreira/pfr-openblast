@@ -142,7 +142,10 @@
       const dateNote = fireDate && adjusted.dateIso !== fireDate
         ? ` Atenção: a data informada (${fireDate.split('-').reverse().join('/')}) é diferente da data deste disparo.`
         : '';
-      statusLine.textContent = `Data ${adjusted.date} e horário ${adjusted.time} selecionados de ${label} (${detonation.fileName}, ajuste ${formatOffset(offsetHours)}).${dateNote}`;
+      const timeNote = fireTimeInput.value && fireTimeInput.value !== adjusted.time
+        ? ` Atenção: o horário informado (${fireTimeInput.value}) é diferente do horário deste disparo.`
+        : '';
+      statusLine.textContent = `Disparo selecionado: ${adjusted.date} às ${adjusted.time}, ${label} (${detonation.fileName}, ajuste ${formatOffset(offsetHours)}).${dateNote}${timeNote}`;
       return;
     }
     if (rankedEntries.some(entry => entry.score > 0)) {
@@ -185,19 +188,25 @@
     renderStatus(typedId, offsetHours);
   }
 
-  function choose(detonationId) {
+  function choose(detonationId, { automatic = false } = {}) {
     const entry = rankedEntries.find(item => item.detonation.id === detonationId);
     if (!entry) return;
-    fireDateInput.value = entry.adjusted.dateIso;
-    fireTimeInput.value = entry.adjusted.time;
-    setMessage(fireDateError);
-    fireDateInput.setAttribute('aria-invalid', 'false');
-    setMessage(fireTimeError);
-    fireTimeInput.setAttribute('aria-invalid', 'false');
-    chosen = { detonationId, filledDate: entry.adjusted.dateIso, filledTime: entry.adjusted.time, dateEdited: false, timeEdited: false };
+    const dateEdited = automatic && Boolean(fireDateInput.value);
+    const timeEdited = automatic && Boolean(fireTimeInput.value);
+    if (!dateEdited) {
+      fireDateInput.value = entry.adjusted.dateIso;
+      setMessage(fireDateError);
+      fireDateInput.setAttribute('aria-invalid', 'false');
+    }
+    if (!timeEdited) {
+      fireTimeInput.value = entry.adjusted.time;
+      setMessage(fireTimeError);
+      fireTimeInput.setAttribute('aria-invalid', 'false');
+    }
+    chosen = { detonationId, filledDate: entry.adjusted.dateIso, filledTime: entry.adjusted.time, dateEdited, timeEdited };
     render();
     // A lista é recriada a cada render; devolve o foco ao disparo escolhido para teclado e leitor de tela.
-    [...list.querySelectorAll('button')].find(button => button.dataset.detonationId === detonationId)?.focus();
+    if (!automatic) [...list.querySelectorAll('button')].find(button => button.dataset.detonationId === detonationId)?.focus();
   }
 
   importButton.addEventListener('click', () => fileInput.click());
@@ -217,9 +226,14 @@
       detonations = parsed.flatMap(item => item.detonations);
       importedFiles = parsed.map(item => item.fileName);
       importWarnings = parsed.flatMap(item => item.warnings.map(warning => `${item.fileName}: ${warning}`));
+      if (detonations.length === 1 && chosen) {
+        if (!chosen.dateEdited && fireDateInput.value === chosen.filledDate) fireDateInput.value = '';
+        if (!chosen.timeEdited && fireTimeInput.value === chosen.filledTime) fireTimeInput.value = '';
+      }
       chosen = null;
       setMessage(importError);
       render();
+      if (rankedEntries.length === 1) choose(rankedEntries[0].detonation.id, { automatic: true });
       panel.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     } catch (error) {
       setMessage(importError, error.message);
@@ -263,6 +277,7 @@
   });
   fireTimeInput.addEventListener('input', () => {
     if (chosen) chosen.timeEdited = true;
+    render();
   });
   fireDateInput.addEventListener('change', render);
 

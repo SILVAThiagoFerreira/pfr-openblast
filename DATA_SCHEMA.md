@@ -91,7 +91,7 @@ Campos/eventos usados:
 - Com HISTO, a data do primeiro `[Fire]` do bloco compatível continua sendo usada quando o campo de data fica vazio. Uma data digitada explicitamente prevalece sobre a data lida do HISTO e é mantida como data local.
 
 ## Entrada BREX (BMO)
-Arquivo: `*.brex` exportado pelo sismógrafo BMO; lido somente no navegador, na importação do botão "Importar BREX (BMO)". Não é entrada do processamento pela linha de comando.
+Arquivo: `*.brex` exportado pelo sismógrafo BMO; lido somente no navegador, ao anexar junto aos demais arquivos ou pelo botão "Importar BREX (BMO)". Não é entrada do processamento pela linha de comando.
 
 Formato: XML 1.0 em UTF-8 (uma cópia com BOM também é aceita). A raiz é `DB_BLASTREPORT_EXCHANGE`; `XSD_VERSION` vale `1.2` nas amostras.
 
@@ -143,3 +143,5 @@ Quando o texto digitado contém um ID numérico entre outras palavras, o número
 
 ### Cabeçalhos de tabela (site)
 As colunas obrigatórias de `Projeto Completo` e `Config Final` são reconhecidas sem diferenciar caixa, acentos, espaços e separadores, somente quando a variação casa com exatamente uma coluna conhecida e a coluna exata ainda não existe. Cada ajuste gera aviso no resultado, apenas para as tabelas que alimentam o cálculo. Aliases já existentes (ex.: `Angle (º)` → `Angle_deg`) continuam sem aviso.
+
+Ao escolher ou arrastar um BREX junto aos demais arquivos, o navegador o lê automaticamente. Se houver um único disparo, a data e o horário locais preenchem os campos vazios; valores já informados são preservados. Com mais de um disparo, o usuário escolhe o evento na lista. A escolha manual permanece disponível e pode substituir os valores.

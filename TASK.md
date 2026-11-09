@@ -69,3 +69,5 @@ Ordem de implementação aplicada (AGENTS.md): configuração (`config.yaml` e `
 - Configuração nova: `business.plan_label_fallback_prefix`, `business.plan_label_max_length`, `business.plan_label_generic_names`, `business.output_name_text_template`. Espelho em `public/config.js`, verificado por `tests/test_browser_config.py`.
 - Testes: `tests/test_plan_label.js`, `tests/test_table_headers.js`, `tests/test_plan_id.js` (ID vazio sem bloqueio), `tests/test_frontend.js` (routing do BREX e espelho `docs/`).
 - Pendência aberta: no modo automático sem HISTO, a regra do SPEC continua bloqueando. Decisão do usuário se deve passar a aceitar data e horário informados.
+
+Ao escolher ou arrastar um BREX junto aos demais arquivos, o navegador o lê automaticamente. Se houver um único disparo, a data e o horário locais preenchem os campos vazios; valores já informados são preservados. Com mais de um disparo, o usuário escolhe o evento na lista. A escolha manual permanece disponível e pode substituir os valores.
