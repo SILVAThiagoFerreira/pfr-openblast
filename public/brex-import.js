@@ -1,6 +1,6 @@
 (() => {
   // Interface do botão "Importar BREX (BMO)": escolhe o arquivo, lista os disparos
-  // com o ajuste de horário aplicado ao vivo e preenche o horário de desmonte (HH:MM:SS).
+  // com o ajuste de horário aplicado ao vivo e preenche a data e o horário local do desmonte (HH:MM:SS).
   // Toda a leitura acontece no navegador; o arquivo não é enviado a servidor.
   const importButton = document.querySelector('#brex-import-button');
   const fileInput = document.querySelector('#brex-file');
@@ -9,6 +9,7 @@
   const fireDateInput = document.querySelector('#manual-fire-date');
   const fireTimeInput = document.querySelector('#manual-fire-time');
   const fireTimeError = document.querySelector('#manual-fire-time-error');
+  const fireDateError = document.querySelector('#manual-fire-date-error');
   const panel = document.querySelector('#brex-panel');
   const offsetInput = document.querySelector('#brex-offset-hours');
   const offsetError = document.querySelector('#brex-offset-error');
@@ -141,16 +142,16 @@
       const dateNote = fireDate && adjusted.dateIso !== fireDate
         ? ` Atenção: a data informada (${fireDate.split('-').reverse().join('/')}) é diferente da data deste disparo.`
         : '';
-      statusLine.textContent = `Horário ${adjusted.time} preenchido a partir de ${label} (${detonation.fileName}, ajuste ${formatOffset(offsetHours)}).${dateNote}`;
+      statusLine.textContent = `Data ${adjusted.date} e horário ${adjusted.time} selecionados de ${label} (${detonation.fileName}, ajuste ${formatOffset(offsetHours)}).${dateNote}`;
       return;
     }
     if (rankedEntries.some(entry => entry.score > 0)) {
-      statusLine.textContent = 'Disparos que combinam com o ID informado estão destacados. Clique em um disparo para preencher o horário.';
+      statusLine.textContent = 'Disparos que combinam com o ID informado estão destacados. Clique em um disparo para preencher a data e o horário.';
       return;
     }
     statusLine.textContent = typedId
-      ? 'Nenhum disparo combina com o ID informado; a lista segue a data informada e a ordem cronológica. Clique em um disparo para preencher o horário.'
-      : 'Clique em um disparo para preencher o horário de desmonte (HH:MM:SS).';
+      ? 'Nenhum disparo combina com o ID informado; a lista segue a data informada e a ordem cronológica. Clique em um disparo para preencher a data e o horário.'
+      : 'Clique em um disparo para preencher a data e o horário de desmonte (HH:MM:SS).';
   }
 
   function render() {
@@ -187,10 +188,13 @@
   function choose(detonationId) {
     const entry = rankedEntries.find(item => item.detonation.id === detonationId);
     if (!entry) return;
+    fireDateInput.value = entry.adjusted.dateIso;
     fireTimeInput.value = entry.adjusted.time;
+    setMessage(fireDateError);
+    fireDateInput.setAttribute('aria-invalid', 'false');
     setMessage(fireTimeError);
     fireTimeInput.setAttribute('aria-invalid', 'false');
-    chosen = { detonationId, filledTime: entry.adjusted.time };
+    chosen = { detonationId, filledDate: entry.adjusted.dateIso, filledTime: entry.adjusted.time, dateEdited: false, timeEdited: false };
     render();
     // A lista é recriada a cada render; devolve o foco ao disparo escolhido para teclado e leitor de tela.
     [...list.querySelectorAll('button')].find(button => button.dataset.detonationId === detonationId)?.focus();
@@ -236,19 +240,30 @@
     isBrexFile: file => /\.brex$/i.test(file.name)
   };
 
-  // Ajuste ao vivo: se o horário ainda é o que o botão preencheu, acompanha o novo ajuste.
+  // Atualiza cada campo apenas enquanto ele não tiver sido alterado pelo usuário.
   offsetInput.addEventListener('input', () => {
     render();
     if (!chosen) return;
     const entry = rankedEntries.find(item => item.detonation.id === chosen.detonationId);
-    if (entry && fireTimeInput.value === chosen.filledTime) {
+    if (!entry) return;
+    if (!chosen.dateEdited && fireDateInput.value === chosen.filledDate) {
+      fireDateInput.value = entry.adjusted.dateIso;
+      chosen.filledDate = entry.adjusted.dateIso;
+    }
+    if (!chosen.timeEdited && fireTimeInput.value === chosen.filledTime) {
       fireTimeInput.value = entry.adjusted.time;
       chosen.filledTime = entry.adjusted.time;
-      render();
     }
+    render();
   });
   planIdentityInput.addEventListener('input', render);
-  fireDateInput.addEventListener('input', render);
+  fireDateInput.addEventListener('input', () => {
+    if (chosen) chosen.dateEdited = true;
+    render();
+  });
+  fireTimeInput.addEventListener('input', () => {
+    if (chosen) chosen.timeEdited = true;
+  });
   fireDateInput.addEventListener('change', render);
 
   try {

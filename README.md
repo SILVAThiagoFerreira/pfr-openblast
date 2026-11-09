@@ -16,7 +16,7 @@ Sistema para gerar o plano de fogo realizado em Excel a partir de arquivos opera
 - `input/PP.pdf` — Plano de Perfuração.pdf
 - `input/PP*.xlsx` (ou `*PERFURA*.xlsx`) — Plano de Perfuração.xlsx; fornece a cota `Z Collar` quando o Config Final não traz cota válida (ver "Cota (Z)")
 - `input/HISTO-*.txt|*_histo.log` — histórico da BMO, obrigatório na validação automática e opcional na execução forçada
-- `*.brex` — relatório BREX do BMO; opcional e somente no site, para preencher o horário de desmonte (ver "Importação do BREX (BMO)")
+- `*.brex` — relatório BREX do BMO; opcional e somente no site, para preencher a data e o horário de desmonte (ver "Importação do BREX (BMO)")
 
 ## Saídas
 - `output/Plano_Fogo_Realizado_<PLANO>.xlsx`
@@ -54,7 +54,7 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 - O histórico antigo `.txt`, o padrão `*_histo.log` e o log DBD `BMO-*_history_DBD.log` são aceitos. O parser reconhece `[BlastingPlan]` e `[BlastPlan]`, além de eventos com data completa ou somente `HH:MM:SS`, herdando a última data completa do histórico.
 - Se o horário do `[Fire]` não puder ser identificado, a tela solicita o horário local do desmonte. O campo `Data local do desmonte` permite corrigir a data; sem HISTO, o botão **Forçar execução** exige que o usuário informe data e horário, sem consultar o relógio do computador. Com HISTO, a data do `[Fire]` é usada quando o campo fica vazio; uma data informada manualmente prevalece. Se houver HISTO, mas nenhum horário `[Fire]` legível, a execução forçada sem horário preenchido mantém o fallback explícito `12:00:00` local. Valores manuais e esse fallback não recebem conversão de fuso.
 - A opção de fuso do site converte somente o horário lido do HISTO antes de gerar o Excel; `UTC-03:00` é o padrão para o horário local de Brasília.
-- O botão **Importar BREX (BMO)**, ao lado de "Horário local do desmonte", lê um relatório `.brex` do BMO no navegador, lista os disparos com o ajuste de horário aplicado e preenche o horário com o disparo escolhido (ver seção abaixo).
+- O botão **Importar BREX (BMO)**, ao lado de "Horário local do desmonte", lê um relatório `.brex` do BMO no navegador, lista os disparos com o ajuste de horário aplicado e preenche a data e o horário com o disparo escolhido (ver seção abaixo).
 - `business.plan_id_source: fallback` sempre respeita `business.fallback_plan_id`, evitando que IDs encontrados no PDF substituam o plano operacional configurado.
 - Quando uma frente usa `plan_id_source: fallback` mas o HISTO não grava o ID no bloco `[BlastingPlan]`, `business.allow_unmatched_plan_fire_fallback: true` permite usar o último `[Fire]` existente; esse comportamento é explícito e reprodutível a partir do próprio HISTO.
 - Em caso de falha, a interface gera um log local da validação no navegador para download em `.txt`; se a geração for acionada sem anexos, informa o próximo passo no próprio resultado, sem iniciar processamento vazio.
@@ -74,7 +74,7 @@ Na tela de identificação e horário, o botão **Importar BREX (BMO)** abre a e
 
 - O relógio do BMO grava em UTC. O campo **Ajuste do horário do BMO (horas)** converte os horários listados; o padrão é `-3` (Brasília). O valor é aplicado ao vivo a todos os disparos.
 - A lista mostra data, horário ajustado e identificadores (plano, nome do BMO, evento, série do BMO e nome do arquivo). Disparos que combinam com o ID informado aparecem primeiro e destacados.
-- Ao clicar em um disparo, o campo **Horário local do desmonte** recebe o horário em HH:MM:SS. A data e o ID não mudam.
+- Ao clicar em um disparo, os campos **Data local do desmonte** e **Horário local do desmonte** recebem a data e o horário ajustados. Ambos podem ser corrigidos manualmente; alterações manuais são preservadas ao mudar o ajuste. O ID não muda.
 - Sem ID de plano no evento, o rótulo do disparo escolhido é o ID digitado no campo de identificação.
 - Em caso de arquivo inválido, a importação é recusada com a mensagem do erro; nenhum horário é inventado.
 - Um arquivo `.brex` arrastado ou escolhido no campo principal de anexos não é tratado como anexo do plano: é encaminhado a esta importação.

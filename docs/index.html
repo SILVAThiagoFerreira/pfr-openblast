@@ -79,7 +79,7 @@
         <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt,.log,.brex" required>
         <span class="upload-icon" aria-hidden="true">↑</span>
         <strong>Escolha os arquivos do plano</strong>
-        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT, LOG ou BREX (o BREX preenche o horário, não é anexo)</span>
+        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT, LOG ou BREX (o BREX preenche a data e o horário, não é anexo)</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
 
@@ -104,7 +104,7 @@
             <legend>Data e horário</legend>
             <label for="manual-fire-date">Data local do desmonte <span class="label-note">(obrigatória sem HISTO)</span></label>
             <input id="manual-fire-date" name="manualFireDate" type="date" autocomplete="off" aria-describedby="manual-fire-date-help manual-fire-date-error">
-            <p id="manual-fire-date-help" class="field-help">Sem HISTO, informe a data em que o desmonte aconteceu. Com HISTO, deixe em branco para usar a data do evento.</p>
+            <p id="manual-fire-date-help" class="field-help">Informe ou corrija a data do desmonte. Ao selecionar um disparo BREX, a data é preenchida automaticamente. Com HISTO, deixe em branco para usar a data do evento.</p>
             <p id="manual-fire-date-error" class="field-error" role="alert" hidden></p>
             <label for="manual-fire-time">Horário local do desmonte <span class="label-note">(obrigatório sem o Historial da BMO)</span></label>
             <div class="fire-time-row">
@@ -236,7 +236,7 @@
   <script src="./charge.js?v=20260917-charge-minimum"></script>
   <script src="./timezone.js?v=20260812"></script>
   <script src="./brex.js?v=20261029-brex"></script>
-  <script src="./brex-import.js?v=20261029-plan-label"></script>
+  <script src="./brex-import.js?v=20261109-brex-date"></script>
   <script src="./elevation.js?v=20261029-elevation-blank"></script>
   <script src="./app.js?v=20261029-elevation"></script>
 </body>
