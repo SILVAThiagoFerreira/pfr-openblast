@@ -73,17 +73,16 @@ def resolve_elevations(
 
     distance = np.hypot(x - plan_x, y - plan_y)
     final_valid = z_final.between(low, high)
+    # Furo de assinatura (`keep`): mesma cota do Config Final que os demais furos, mas sem substituição pelo
+    # Plano de Perfuração e sem cálculo de Z (toe) pela geometria (são alterações de valor).
     design_valid = plan_z.between(low, high) & (distance <= tolerance) & ~keep
-    crest = z_final.where(final_valid | keep, plan_z.where(design_valid))
-    crest_source = pd.Series(
-        np.where(keep, "signature", np.where(final_valid, "final", np.where(design_valid, "design", ""))),
-        index=result.index,
-    )
+    crest = z_final.where(final_valid, plan_z.where(design_valid))
+    crest_source = pd.Series(np.where(final_valid, "final", np.where(design_valid, "design", "")), index=result.index)
 
     toe_from_final = (crest_source == "final") & z_toe_final.between(low, high)
     toe_computed = ~toe_from_final & crest.notna() & length.notna() & angle.notna() & ~keep
     computed = crest - length * np.cos(np.radians(angle))
-    toe = z_toe_final.where(toe_from_final | keep, computed).where(toe_from_final | toe_computed | keep)
+    toe = z_toe_final.where(toe_from_final, computed).where(toe_from_final | toe_computed)
 
     result["Z"] = crest
     result["Z_Toe"] = toe
@@ -94,12 +93,18 @@ def resolve_elevations(
         value = z_final.loc[index]
         if pd.isna(value):
             warnings.append(
-                f"Furo de assinatura {number}: sem Z no Config Final; Z (crest) e Z (toe) ficam em branco, como na entrada."
+                f"Furo de assinatura {number}: sem Z no Config Final; Z (crest) e Z (toe) ficam em branco."
             )
         elif not final_valid.loc[index]:
             warnings.append(
-                f"Furo de assinatura {number}: Z (crest) = {_fmt(value)} mantido como veio do Config Final, "
-                f"embora fora da faixa de cota ({low:g} a {high:g} m)."
+                f"Furo de assinatura {number}: o Z do Config Final ({_fmt(value)}) não é cota (fora da faixa de "
+                f"{low:g} a {high:g} m). Para este furo não há substituição pelo Plano de Perfuração nem cálculo de "
+                "Z (toe); Z (crest) e Z (toe) ficam em branco."
+            )
+        elif not z_toe_final.between(low, high).loc[index]:
+            warnings.append(
+                f"Furo de assinatura {number}: o Z_Toe do Config Final não é cota ou está em branco; Z (toe) fica em "
+                "branco, porque não é calculado para este furo."
             )
 
     invalid_final = z_final.notna() & ~final_valid & ~keep

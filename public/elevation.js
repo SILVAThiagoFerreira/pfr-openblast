@@ -7,8 +7,8 @@
   //    Senão, Z (crest) - profundidade realizada * cos(inclinação), com aviso.
   //  - Nenhum furo com cota: não bloqueia. Z (crest) e Z (toe) ficam em branco e o aviso
   //    "Nenhum furo com cota; Z em branco" aparece no topo da lista de avisos.
-  //  - Furo de assinatura (hole.preserved): Z (crest) e Z (toe) são os valores do Config Final como vieram,
-  //    sem consulta ao plano nem cálculo pela geometria, e sem bloqueio mesmo fora da faixa (aviso).
+  //  - Furo de assinatura (hole.preserved): mesma cota do Config Final que os demais furos (faixa e formato), mas
+  //    sem substituição pelo plano e sem cálculo de Z (toe) pela geometria. Fora da faixa, fica em branco com aviso.
   // config: { minM, maxM, matchToleranceM } (espelho de business.elevation_* em config.yaml).
   // holes: [{ number, x, y, z, zToe, length, angle, preserved }] e designRows: [{ number, x, y, z }], valores numéricos ou null.
 
@@ -27,17 +27,28 @@
     const missing = [];
     const preservedInvalid = [];
     const preservedBlank = [];
+    const preservedToeInvalid = [];
     const counts = { final: 0, design: 0, signature: 0, toeFinal: 0, toeComputed: 0, toeMissing: 0 };
 
     for (const hole of holes) {
       if (hole.preserved) {
-        // Furo de assinatura: Z e Z_Toe do Config Final como vieram (SPEC.md, "Furo de assinatura").
-        byNumber.set(hole.number, { zCrest: hole.z, zToe: hole.zToe, crestSource: 'signature', toeSource: 'signature' });
+        // Furo de assinatura (SPEC.md, "Furo de assinatura"): só a cota do próprio Config Final, na mesma faixa
+        // dos demais furos; sem substituição pelo Plano de Perfuração e sem cálculo de Z (toe) pela geometria.
+        const crestValid = isPlausibleElevation(hole.z, config);
+        const toeValid = crestValid && isPlausibleElevation(hole.zToe, config);
+        byNumber.set(hole.number, {
+          zCrest: crestValid ? hole.z : null,
+          zToe: toeValid ? hole.zToe : null,
+          crestSource: crestValid ? 'final' : null,
+          toeSource: toeValid ? 'final' : null,
+        });
         if (hole.z === null) {
           preservedBlank.push(hole.number);
+        } else if (!crestValid) {
+          preservedInvalid.push(hole);
         } else {
           counts.signature += 1;
-          if (!isPlausibleElevation(hole.z, config)) preservedInvalid.push(hole);
+          if (!toeValid) preservedToeInvalid.push(hole.number);
         }
         continue;
       }
@@ -100,12 +111,19 @@
     }
     for (const hole of preservedInvalid) {
       warnings.push(
-        `Furo de assinatura ${hole.number}: Z (crest) = ${roundForMessage(hole.z)} mantido como veio do Config Final, ` +
-        `embora fora da faixa de cota (${config.minM} a ${config.maxM} m).`
+        `Furo de assinatura ${hole.number}: o Z do Config Final (${roundForMessage(hole.z)}) não é cota (fora da faixa de ` +
+        `${config.minM} a ${config.maxM} m). Para este furo não há substituição pelo Plano de Perfuração nem cálculo de ` +
+        'Z (toe); Z (crest) e Z (toe) ficam em branco.'
       );
     }
     for (const number of preservedBlank) {
-      warnings.push(`Furo de assinatura ${number}: sem Z no Config Final; Z (crest) e Z (toe) ficam em branco, como na entrada.`);
+      warnings.push(`Furo de assinatura ${number}: sem Z no Config Final; Z (crest) e Z (toe) ficam em branco.`);
+    }
+    for (const number of preservedToeInvalid) {
+      warnings.push(
+        `Furo de assinatura ${number}: o Z_Toe do Config Final não é cota ou está em branco; Z (toe) fica em branco, ` +
+        'porque não é calculado para este furo.'
+      );
     }
     if (invalidFinal.length) {
       const examples = invalidFinal.slice(0, 3).map(hole => `${hole.number} = ${roundForMessage(hole.z)}`).join('; ');

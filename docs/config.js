@@ -31,7 +31,8 @@ window.PFR_BROWSER_CONFIG = {
     elevationPlausibleMaxM: 5000,
     elevationDesignMatchToleranceM: 0.5,
     elevationDesignSheetPattern: 'PROJETO PERFURA',
-    // Furo de assinatura (espelho de business.signature_hole_id; vazio = sem furo de assinatura).
+    // Furo de assinatura (espelho de business.signature_hole_id; vazio = sem furo de assinatura). Carga e tampão
+    // desse furo não recebem ajustes automáticos; conversões, arredondamentos, tempo e cota seguem a regra normal.
     signatureHoleId: ''
   }
 };

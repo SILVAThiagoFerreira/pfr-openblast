@@ -40,17 +40,21 @@
     return indexes[0];
   }
 
-  // O tempo do furo de assinatura é preservado, então não pode ser imputado: precisa ser inteiro,
-  // não negativo e único depois do arredondamento. `rawTimes` tem números ou null.
+  // Tempo do furo de assinatura: recebe o mesmo arredondamento para inteiro dos demais furos, mas não pode ser
+  // imputado. Por isso precisa de tempo válido (não vazio nem negativo) e não pode repetir o tempo de um furo
+  // anterior (a sequência mantém a primeira ocorrência e imputa as seguintes). `rawTimes` tem números ou null.
   function validateTime(rawTimes, index, holeId) {
     const raw = rawTimes[index];
-    const message = `O furo de assinatura ${holeId} não tem tempo de detonação válido na entrada ` +
-      '(vazio, negativo, não inteiro ou repetido em outro furo). Como o tempo deve ser preservado como veio da entrada, corrija o Config Final.';
-    if (raw === null || raw === undefined || !Number.isInteger(raw) || raw < 0) {
+    const message = `O furo de assinatura ${holeId} não tem tempo de detonação válido na entrada: vazio, negativo ou repetido ` +
+      'de um furo anterior. O tempo não pode ser imputado para o furo de assinatura; corrija o Config Final.';
+    if (raw === null || raw === undefined || raw < 0) {
       throw coded('SIGNATURE_HOLE_TIME', message);
     }
-    const sameTime = rawTimes.filter(value => value !== null && value !== undefined && value >= 0 && Math.round(value) === raw).length;
-    if (sameTime !== 1) {
+    const normalized = Math.round(raw);
+    const repeatedBefore = rawTimes.slice(0, index).some(value => (
+      value !== null && value !== undefined && value >= 0 && Math.round(value) === normalized
+    ));
+    if (repeatedBefore) {
       throw coded('SIGNATURE_HOLE_TIME', message);
     }
   }

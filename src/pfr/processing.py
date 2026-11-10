@@ -771,23 +771,25 @@ def build_output_frame(
     cfg: dict,
     signature_mask: pd.Series | None = None,
 ) -> pd.DataFrame:
-    # Furo de assinatura (SPEC.md, "Furo de assinatura"): carga, tampão realizado, tempo, diâmetro e cota
-    # são os valores de entrada; nenhuma regra automática de ajuste se aplica a ele.
+    # Furo de assinatura (SPEC.md, "Furo de assinatura"): nenhuma regra de ajuste de valor (carga, carga-alvo,
+    # variação de tampão) se aplica a ele. Conversões, arredondamentos e formatação seguem a regra normal.
     if signature_mask is None:
         signature_mask = validate_signature_hole(merged, cfg)
     preserved = signature_mask.reindex(merged.index, fill_value=False).astype(bool)
 
     diameter_raw = _series_or_na(merged, "Diameter_m")
     diameter = diameter_raw.where(diameter_raw.isna() | (diameter_raw >= 1), (diameter_raw * 1000 / 25.4))
-    diameter = diameter.where(~preserved, diameter_raw)
 
     detonating_raw = _series_or_na(merged, "DetonatingTime")
     detonating_time, imputed_count = _fill_missing_detonating_time(
         detonating_raw,
         cfg["business"].get("fill_missing_detonating_time", True),
     )
-    if preserved.any() and (detonating_time[preserved].astype(float) != detonating_raw[preserved].astype(float)).any():
-        raise ValueError("O tempo de detonação do furo de assinatura foi alterado; a entrada deve ser preservada.")
+    if preserved.any():
+        # O furo não pode ter o tempo imputado: a única alteração permitida é o arredondamento para inteiro.
+        expected_time = detonating_raw.round(0)[preserved].astype(float)
+        if (detonating_time[preserved].astype(float) != expected_time).any():
+            raise ValueError("O tempo de detonação do furo de assinatura foi imputado; ele não pode ser alterado.")
 
     stemming_raw = _series_or_na(merged, "r_stemming")
     stemming_real, stemming_variation_count = _apply_stemming_variation(
@@ -799,7 +801,6 @@ def build_output_frame(
         preserved,
     )
     stemming_real = pd.to_numeric(stemming_real, errors="coerce").round(1)
-    stemming_real = stemming_real.where(~preserved, stemming_raw)
     merged.attrs["imputed_detonating_time_count"] = imputed_count
     merged.attrs["stemming_variation_count"] = stemming_variation_count
     merged.attrs["signature_hole_count"] = int(preserved.sum())

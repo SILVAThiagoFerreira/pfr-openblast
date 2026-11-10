@@ -10,8 +10,8 @@
     return new Uint8Array([hash >>> 24, hash >>> 16, hash >>> 8, hash, hash >>> 16, hash >>> 8, hash >>> 24, hash]);
   }
 
-  // options: { enabled, maxDelta, preservedIndexes }. Furos em preservedIndexes (furo de assinatura)
-  // mantêm o tampão de entrada exato, sem variação e sem arredondamento de uma casa.
+  // options: { enabled, maxDelta, preservedIndexes }. Furos em preservedIndexes (furo de assinatura) não recebem
+  // a variação simulada; a casa decimal segue a regra normal dos demais furos (arredondamento para uma casa).
   async function applyVariation(values, numbers, planId, options = {}) {
     const { enabled = false, maxDelta = 0.12, preservedIndexes = [] } = options;
     if (!enabled) return values;
@@ -25,7 +25,7 @@
       const sign = digest[4] % 2 ? 1 : -1;
       result[index] = Math.max(0, Math.round((result[index] + sign * magnitude) * 100) / 100);
     }
-    return result.map((value, index) => (value === null || preserved.has(index) ? value : Math.round(value * 10) / 10));
+    return result.map(value => (value === null ? null : Math.round(value * 10) / 10));
   }
 
   root.OpenBlastStemming = { applyVariation };

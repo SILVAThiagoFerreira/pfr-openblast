@@ -45,15 +45,16 @@ def validate_signature_hole(merged: pd.DataFrame, cfg: dict) -> pd.Series:
 
     position = positions[0]
     times = pd.to_numeric(merged["DetonatingTime"], errors="coerce") if "DetonatingTime" in merged.columns else pd.Series(float("nan"), index=merged.index)
-    raw = float(times.iloc[position])
-    time_message = (
-        f"O furo de assinatura {hole_id} não tem tempo de detonação válido na entrada (vazio, negativo, não inteiro "
-        "ou repetido em outro furo). Como o tempo deve ser preservado como veio da entrada, corrija o Config Final."
-    )
-    if pd.isna(raw) or raw < 0 or not raw.is_integer():
-        raise ValueError(time_message)
+    # Mesmo tratamento de formato dos demais furos (arredondamento para inteiro; negativo ou vazio é ausência).
+    # Como o tempo não pode ser imputado para este furo, ele precisa de tempo válido e não pode repetir o tempo de
+    # um furo anterior (a sequência mantém a primeira ocorrência e imputa as seguintes).
     normalized = times.round(0).where(times >= 0)
-    if int((normalized == raw).sum()) != 1:
+    value = normalized.iloc[position]
+    time_message = (
+        f"O furo de assinatura {hole_id} não tem tempo de detonação válido na entrada: vazio, negativo ou repetido "
+        "de um furo anterior. O tempo não pode ser imputado para o furo de assinatura; corrija o Config Final."
+    )
+    if pd.isna(value) or bool((normalized.iloc[:position] == value).any()):
         raise ValueError(time_message)
 
     mask.iloc[position] = True

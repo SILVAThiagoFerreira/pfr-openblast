@@ -44,7 +44,9 @@ Motivo: o `Config Final` exportado em 27/10/2026 (REG CRISTA F3) trazia em `Z` v
 - Implementação: `public/elevation.js` (site) e `src/pfr/elevation.py` (CLI); mesma regra e mesmos avisos. Validação da planilha de plano: `src/pfr/validation.py` (`check_design_columns`). Testes: `tests/test_elevation.js` e `tests/test_elevation.py`.
 
 ## Furo de assinatura
-Motivo: um plano pode ter um furo de assinatura cujos dados realizados devem permanecer exatamente como foram informados, sem os ajustes automáticos do processamento. Os demais furos seguem as regras atuais.
+Motivo: num plano pode haver um furo de assinatura cuja carga e cujo tampão não podem ser alterados por regras de ajuste de valor. Ele continua passando por todas as conversões e formatações normais, como os demais furos.
+
+Sentido da regra: "preservado" significa não alterar valores por regras de ajuste (aumentar ou diminuir a carga, variar o tampão, alterar profundidade ou qualquer regra que mude um número em relação à entrada). Não significa manter o formato: diâmetro, cota, unidades, arredondamentos e colunas seguem a regra normal.
 
 - Configuração: `business.signature_hole_id` em `config.yaml` (CLI e Flask) — ID do furo (`Number` do Config Final); vazio = sem furo de assinatura (padrão). No site, o bloco "Furo de assinatura" (em "Opções de saída") tem o checkbox "Plano teve furo de assinatura?" e o campo "ID do furo de assinatura", que aceita digitação e oferece os `Number` do Config Final anexado. O valor padrão do site é o espelho `signatureHoleId` em `public/config.js` (vazio).
 - Sem o checkbox marcado (ou com `signature_hole_id` vazio), o resultado é idêntico ao comportamento sem a regra.
@@ -53,22 +55,23 @@ Validação (bloqueante, com mensagem explícita; nunca silenciosa):
 - O ID deve conter somente dígitos (`Number` inteiro). Vazio, texto ou decimal é recusado.
 - O ID deve existir no plano processado (Config Final, após `business.include_eliminated`). Ausente: erro.
 - O ID deve aparecer uma única vez no Config Final. Repetido: erro.
-- O tempo de detonação do furo deve ser inteiro, não negativo e único depois do arredondamento. Como o tempo é preservado e não imputado, vazio, negativo, não inteiro ou repetido em outro furo bloqueia com a orientação de corrigir o Config Final.
-- No site, o furo de assinatura não pode ser o furo de menor carga informado no bloco de carga-alvo (a carga dele é preservada).
+- Tempo de detonação: o furo recebe o mesmo arredondamento para inteiro dos demais. Como o tempo não pode ser imputado para ele, o furo precisa de tempo válido na entrada: vazio, negativo ou repetido de um furo anterior bloqueia. Um furo posterior com o mesmo tempo é imputado normalmente.
+- No site, o furo de assinatura não pode ser o furo de menor carga informado no bloco de carga-alvo (a carga dele não recebe ajuste).
 
-Preservação (valores do furo de assinatura iguais aos da entrada):
-- `cargas realizadas` = `InputedCharge`: sem redistribuição de carga zerada, sem alvo de carga e sem fechamento de total. Carga zero continua zero.
-- `tampao realizado` = `Stemming` do Config Final: sem variação simulada e sem arredondamento para uma casa decimal.
-- `tempo detonacao (ms)` = `DetonatingTime`: sem imputação de tempo.
-- `diametro` = `Diameter` como veio: sem conversão de metros para polegadas (ver "Pendências" em TASK.md).
-- `Z (crest)` = `Z` do Config Final e `Z (toe)` = `Z_Toe` do Config Final, mesmo quando o `Z` não é cota: sem substituição pelo Plano de Perfuração e sem cálculo pela geometria. Fora da faixa de cota ou sem Z, há aviso explícito.
-- Os demais campos do furo (profundidade, azimute, inclinação, subfuração, previstos, X e Y) já vêm da entrada e não passam por regra de ajuste.
+Carga e tampão (sem ajuste de valor):
+- `cargas realizadas` = `InputedCharge` do Config Final: sem redistribuição de carga zerada, sem carga-alvo, sem fechamento de total e sem carga mínima por furo. Carga zero continua zero. O furo entra no total; quando há alvo, os demais furos absorvem a diferença.
+- `tampao realizado` = `Stemming` do Config Final: sem variação simulada. A casa decimal segue a regra normal (uma casa: 3,5 fica 3,5; 3,04 vira 3,0).
+
+Formatação, conversões e cota (regra normal dos demais furos):
+- `diametro`: convertido de metros para polegadas quando menor que 1 (0,127 m vira 5), como nos demais furos.
+- `tempo detonacao (ms)`: inteiro, com a mesma regra de unicidade; sem imputação (ver validação).
+- `Z (crest)` e `Z (toe)`: cota do Config Final quando é cota (faixa `business.elevation_plausible_*`); Z (toe) do Config Final quando o Z (crest) veio dele e o Z_Toe é cota. Para este furo não há substituição pelo Plano de Perfuração nem cálculo de Z (toe) pela geometria, porque são alterações de valor. Sem cota válida, fica em branco com aviso.
+- Demais campos (X, Y, profundidade prevista e realizada, azimute, inclinação, subfuração e previstos): mesmo tratamento dos demais furos. Não há regra de ajuste de profundidade; o preenchimento a partir do Projeto Completo, quando o Config Final não traz o valor, segue a regra normal.
 
 Demais furos:
 - Seguem as regras atuais (carga zerada, alvo de carga, tampão simulado, tempos imputados, diâmetro convertido, cota pelo plano).
-- Com alvo de carga, o total fecha no alvo contando a carga fixa do furo de assinatura; os demais furos absorvem a diferença entre o alvo e essa carga.
 
-Avisos e registro: a CLI registra no log o furo preservado; o site mostra o furo nos detalhes do resultado e o informa no log local de erro. Os avisos de cota do furo aparecem na lista de avisos.
+Avisos e registro: a CLI registra no log o furo de assinatura; o site mostra o furo nos detalhes do resultado e no log local de erro. Os avisos de cota do furo aparecem na lista de avisos.
 
 Implementação: `src/pfr/validation.py` (`parse_signature_hole_id`, `validate_signature_hole`), `src/pfr/processing.py` (`build_output_frame`), `src/pfr/elevation.py` (`resolve_elevations`, parâmetro `preserved`); no site, `public/signature-hole.js` (ID e tempo), `public/charge.js` (`distributeCharges` e `redistributeZeroCharges` com `fixedIndexes`), `public/stemming.js` (`applyVariation` com `preservedIndexes`), `public/elevation.js` (`hole.preserved`) e `public/app.js` (`buildRows`). Testes: `tests/test_signature_hole.py`, `tests/test_signature_hole.js`, `tests/test_browser_config.py`, `tests/test_frontend.js`.
 

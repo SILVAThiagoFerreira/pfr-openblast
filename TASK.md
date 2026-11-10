@@ -73,16 +73,17 @@ Ordem de implementação aplicada (AGENTS.md): configuração (`config.yaml` e `
 Ao escolher ou arrastar um BREX junto aos demais arquivos, o navegador o lê automaticamente. Se houver um único disparo, a data e o horário locais preenchem os campos vazios; valores já informados são preservados. Com mais de um disparo, o usuário escolhe o evento na lista. A escolha manual permanece disponível e pode substituir os valores.
 
 ## Atualização: furo de assinatura
-Motivo: um furo de assinatura do plano deve manter os dados realizados exatamente como vieram da entrada (carga, tampão, tempo, diâmetro e cota), sem as regras automáticas que ajustam os demais furos.
+Motivo: o furo de assinatura não pode ter carga e tampão alterados por regras de ajuste de valor (redistribuição, carga-alvo e variação de tampão). Ele não fica isento de conversões e formatações.
+
+Correção do usuário (segunda rodada): "preservado" significa não alterar valores por regras de ajuste, como aumentar ou diminuir a carga e variar o tampão. Não significa preservar o formato. O diâmetro sai convertido para polegadas (5, não 0,127); a cota, as unidades, os arredondamentos e as colunas seguem a regra normal. Só ficam de fora os ajustes de valor. O tempo segue o mesmo tratamento dos demais, sem imputação, porque imputar altera um valor.
 
 Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), configuração (`business.signature_hole_id` em `config.yaml` e `public/config.js`), validação (`src/pfr/validation.py`, `public/signature-hole.js`), processamento (`src/pfr/processing.py`, `src/pfr/elevation.py`, `public/charge.js`, `public/stemming.js`, `public/elevation.js`, `public/app.js`), interface (`public/index.html`, `public/force-execution.css`), testes e documentação. O `docs/` espelha `public/`.
 
 - Checkbox "Plano teve furo de assinatura?" e campo de ID com lista dos furos do Config Final (aceita digitação), no bloco "Opções de saída".
-- ID inválido, ausente ou repetido, e tempo de detonação não preservável (vazio, negativo, não inteiro ou repetido), bloqueiam com mensagem explícita. Nada é ignorado em silêncio.
-- Furo de assinatura: carga, tampão realizado, tempo, diâmetro e Z/Z_Toe como na entrada. Demais furos: regras atuais, com o total de carga fechando contando a carga fixa.
+- ID inválido, ausente ou repetido, e tempo que não pode ser usado sem imputação (vazio, negativo ou repetido de um furo anterior), bloqueiam com mensagem explícita.
+- Carga e tampão do furo: fora da redistribuição de zeros, do alvo de carga, do fechamento de total e da variação. Conversões, arredondamentos, tempo e cota: regra normal.
 - Sem o checkbox marcado (ou com `signature_hole_id` vazio), o comportamento é idêntico ao anterior.
-- Testes: `tests/test_signature_hole.py` (inclui execução completa da CLI), `tests/test_signature_hole.js`, `tests/test_browser_config.py`, `tests/test_frontend.js`.
+- Testes: `tests/test_signature_hole.py` (inclui execução completa da CLI e diâmetro em polegadas), `tests/test_signature_hole.js`, `tests/test_browser_config.py`, `tests/test_frontend.js`.
 
-Pendências (decisão do usuário):
-- Diâmetro: o pedido de preservar o furo "exatamente como veio" mantém o valor de entrada em metros (ex.: `0,127`), enquanto os demais furos saem em polegadas (ex.: `5`). Se a coluna `diametro` precisar de uma só unidade, a conversão deve ser aplicada também ao furo de assinatura, o que muda a regra acima.
-- O backend Flask (`/api/generate`) não recebe o campo do site; o furo só é aplicado pela configuração `business.signature_hole_id`, como o alvo de carga.
+Pendências:
+- Backend Flask (`/api/generate`) não recebe o campo do site; o furo só é aplicado pela configuração `business.signature_hole_id`, como o alvo de carga.

@@ -61,16 +61,15 @@ Configuração (`config.yaml`, espelhada em `public/config.js`):
 Exemplo validado (REG CRISTA F3, 27/10/2026): furo 171 — `Z Collar` 287,63; `Z (toe)` = 287,63 - 8,4 * cos(15°) = 279,516. Furos 1000, 1001, 1002, 1004 e 1006 do Config Final não existem no plano (Projeto Completo com UTM zerado): ficam sem cota.
 
 ## Furo de assinatura
-Configuração: `business.signature_hole_id` (`config.yaml`; espelho `signatureHoleId` em `public/config.js`). Texto com somente dígitos, o `Number` do furo; vazio = sem furo de assinatura.
+Configuração: `business.signature_hole_id` (`config.yaml`; espelho `signatureHoleId` em `public/config.js`). Somente dígitos, o `Number` do furo; vazio = sem furo de assinatura.
 
-Colunas de `Dados dos Furos` para o furo de assinatura (valores de entrada, sem regra automática):
-- `cargas realizadas` = `InputedCharge` do Config Final.
-- `tampao realizado` = `Stemming` do Config Final, sem variação e sem arredondamento de uma casa.
-- `tempo detonacao (ms)` = `DetonatingTime` do Config Final, inteiro, não negativo e único (validado; não imputado).
-- `diametro` = `Diameter` do Config Final como veio (metros, quando o arquivo traz metros). Os demais furos seguem a conversão para polegadas.
-- `Z (crest)` = `Z` do Config Final e `Z (toe)` = `Z_Toe` do Config Final, sem uso do Plano de Perfuração e sem cálculo pela geometria.
-
-Demais colunas (`cargas previstas`, `tampao previsto`, `profundidade prevista/realizada`, `azimute`, `inclinacao`, `subfuracao`, `x`, `y`) seguem como na entrada.
+Regra de valor e formato em `Dados dos Furos` para o furo de assinatura (SPEC.md, "Furo de assinatura"): sem ajuste de valor em carga e tampão; formato, conversões e cota seguem a regra normal.
+- `cargas realizadas` = `InputedCharge` do Config Final, sem ajuste de valor (redistribuição, carga-alvo, fechamento de total).
+- `tampao realizado` = `Stemming` do Config Final, sem variação simulada; uma casa decimal (formato normal).
+- `tempo detonacao (ms)` = `DetonatingTime` do Config Final arredondado para inteiro (formato normal). Não é imputado: o furo precisa de tempo válido na entrada (vazio, negativo ou repetido de um furo anterior bloqueia).
+- `diametro` = `Diameter` do Config Final convertido para polegadas quando menor que 1 (formato normal: 0,127 m vira 5).
+- `Z (crest)` = `Z` do Config Final quando é cota; `Z (toe)` = `Z_Toe` do Config Final quando o Z (crest) é cota e o Z_Toe também é. Sem substituição pelo Plano de Perfuração e sem cálculo de Z (toe).
+- Demais colunas (`cargas previstas`, `tampao previsto`, `profundidade prevista/realizada`, `azimute`, `inclinacao`, `subfuracao`, `x`, `y`): formato e regra normal.
 
 Abas: o furo de assinatura não cria aba nova; a aba `Resumo` continua somente com `Plano`, `Data` e `Hora`.
 

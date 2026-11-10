@@ -590,8 +590,9 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
     : mergedCandidates.filter(row => parseNumber(row.eliminated) === null || parseNumber(row.eliminated) === 0))
     .sort((left, right) => (parseNumber(left.Number) ?? 0) - (parseNumber(right.Number) ?? 0));
   const numbers = merged.map(row => parseNumber(row.Number));
-  // Furo de assinatura (SPEC.md, "Furo de assinatura"): carga, tampão realizado, tempo, diâmetro e cota
-  // ficam como vieram da entrada. ID ausente/repetido e tempo inválido bloqueiam com mensagem explícita.
+  // Furo de assinatura (SPEC.md, "Furo de assinatura"): sem ajustes de valor em carga (redistribuição e carga-alvo)
+  // e tampão (variação). Conversões, arredondamentos e cota seguem a regra normal. ID ausente/repetido e tempo que
+  // não pode ser preservado sem imputação bloqueiam com mensagem explícita.
   const signatureIndex = signatureOptions.enabled
     ? window.OpenBlastSignatureHole.findHoleIndex(numbers, signatureOptions.holeId)
     : -1;
@@ -615,8 +616,9 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
     }
   );
   const times = window.OpenBlastTiming.fillMissingTimes(rawTimes).values;
-  if (signatureIndex >= 0 && times[signatureIndex] !== rawTimes[signatureIndex]) {
-    throw new Error('O tempo de detonação do furo de assinatura foi alterado; a entrada deve ser preservada.');
+  // O tempo do furo recebe só o arredondamento para inteiro (nunca imputação).
+  if (signatureIndex >= 0 && times[signatureIndex] !== Math.round(rawTimes[signatureIndex])) {
+    throw new Error('O tempo de detonação do furo de assinatura foi imputado; ele não pode ser alterado.');
   }
   const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
   const baseCharges = window.OpenBlastCharge.redistributeZeroCharges(rawCharges, {
@@ -670,10 +672,8 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
   return stemming.then(stemmingValues => {
     const data = merged.map((row, index) => {
       const diameterRaw = parseNumber(row.Diameter);
-      // Diâmetro do furo de assinatura: valor de entrada, sem a conversão de metros para polegadas.
-      const diameter = preserved.has(index)
-        ? diameterRaw
-        : (diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw);
+      // Conversão normal (metros para polegadas), inclusive no furo de assinatura.
+      const diameter = diameterRaw !== null && diameterRaw < 1 ? (diameterRaw * 1000) / 25.4 : diameterRaw;
       return {
         Data: event.date, Horario: event.time, Plano: event.planId, Tipo: BUSINESS.type, id: numbers[index],
         y: parseNumber(row.Y), x: parseNumber(row.X),
@@ -871,7 +871,7 @@ async function runGeneration(force = false) {
     }
     if (generated.signatureHoleId !== null && generated.signatureHoleId !== undefined) {
       const signatureNote = document.createElement('p');
-      signatureNote.textContent = `Furo de assinatura ${generated.signatureHoleId}: carga, tampão realizado, tempo de detonação, diâmetro e cota foram mantidos como vieram da entrada. Os demais furos seguiram as regras normais.`;
+      signatureNote.textContent = `Furo de assinatura ${generated.signatureHoleId}: carga e tampão realizado não receberam ajustes automáticos (redistribuição, carga-alvo e variação). Conversões, arredondamentos, tempo e cota seguem a regra normal dos demais furos.`;
       result.append(signatureNote);
     }
     if (generated.chargeTargetApplied) {

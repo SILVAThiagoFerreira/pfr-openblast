@@ -105,7 +105,8 @@ def run(
         logger.info("Carga total ajustada para %s kg preservando os extremos", cfg["business"].get("charge_total_target_kg"))
     if merged.attrs.get("signature_hole_count", 0):
         logger.info(
-            "Furo de assinatura %s preservado: carga, tampao realizado, tempo, diametro e cota mantidos como na entrada",
+            "Furo de assinatura %s: carga e tampao sem ajustes automaticos (redistribuicao, carga-alvo e variacao); "
+            "conversoes, arredondamentos, tempo e cota seguem a regra normal",
             cfg["business"].get("signature_hole_id"),
         )
     summary = build_summary(plan_id, blast_date, blast_time)

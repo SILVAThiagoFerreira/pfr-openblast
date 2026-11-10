@@ -38,13 +38,13 @@
 ### Furo de assinatura (passos)
 Regras em SPEC.md, seção "Furo de assinatura". Quando não há furo de assinatura, nenhum destes passos altera o resultado.
 
-- Após a mesclagem (passo 11), validar o furo de assinatura (`validation.validate_signature_hole`, CLI; no site, `signature-hole.js` valida o ID digitado antes do processamento e `buildRows` valida a existência e o tempo). ID inválido, ausente, repetido ou com tempo que não pode ser preservado interrompe a execução com mensagem explícita.
-- Cota (passo 17): o `Z` e o `Z_Toe` do furo de assinatura são os do Config Final, sem consulta ao plano e sem cálculo pela geometria, mesmo fora da faixa de cota (com aviso).
-- Carga (passos 13 e 14): o furo de assinatura é fixo; a redistribuição de zeros e o fechamento do total (ou o alvo informado no site) atuam nos demais furos, com o total contando a carga fixa.
-- Tempo (passo 12): o tempo do furo de assinatura é o valor de entrada; ele já foi validado como inteiro, não negativo e único, e não é imputado.
-- Tampão (passo 15): o tampão realizado do furo de assinatura é o valor de entrada, sem variação e sem arredondamento.
-- Diâmetro (passo 16): o diâmetro do furo de assinatura é o valor de entrada, sem conversão de metros para polegadas.
-- Saída (passos 18 e 19): a linha do furo aparece na aba `Dados dos Furos` com os valores acima; a CLI registra o furo preservado no log; no site, o furo aparece nos detalhes do resultado.
+- Após a mesclagem (passo 11), validar o furo de assinatura (`validation.validate_signature_hole`, CLI; no site, `signature-hole.js` valida o ID digitado e `buildRows` valida a existência e o tempo). ID inválido, ausente, repetido ou sem tempo válido na entrada interrompe a execução com mensagem explícita.
+- Cota (passo 11, elemento de cota): o furo usa a cota do Config Final quando ela é cota; não é substituído pelo Plano de Perfuração e não tem Z (toe) calculado pela geometria. Fora da faixa, fica em branco com aviso.
+- Carga (passos 13 e 14): o furo fica fora da redistribuição de zeros e do fechamento do total (ou do alvo informado no site). Os demais furos absorvem a diferença, e o total conta a carga do furo.
+- Tempo (passo 12): recebe o arredondamento para inteiro e não é imputado; por isso precisa de tempo válido na entrada.
+- Tampão (passo 15): sem variação simulada; a casa decimal segue a regra normal (passo 16).
+- Diâmetro (passo 16): conversão normal de metros para polegadas, como nos demais furos.
+- Saída (passos 18 e 19): a linha do furo aparece na aba `Dados dos Furos` com os valores acima; a CLI registra o furo no log; no site, o furo aparece nos detalhes do resultado.
 
 ### Modo online incremental
 As seleções sucessivas são acumuladas em memória, com deduplicação por nome, tamanho e data de modificação. A remoção atualiza imediatamente o conjunto submetido. Antes de escolher o evento do HISTO, o pipeline coleta IDs candidatos dos nomes e das primeiras linhas das tabelas e cruza-os com o bloco de plano usando a composição `PLANO;MÊS;ANO`: zeros à esquerda e separadores são normalizados, o ano é preservado e o mês não impede a associação.
