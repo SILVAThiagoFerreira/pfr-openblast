@@ -6,7 +6,7 @@
   <meta name="description" content="Geração local do Plano de Fogo Realizado em Excel.">
   <title>Plano de Fogo Realizado</title>
   <link rel="icon" type="image/svg+xml" href="./assets/openblast-favicon-white.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261029-plan-label">
+  <link rel="stylesheet" href="./styles.css?v=20261112-clean-ui">
   <link rel="stylesheet" href="./force-execution.css?v=20261109-signature">
   <link rel="stylesheet" href="./brex-import.css?v=20261029-brex">
 </head>
@@ -20,9 +20,7 @@
   <main class="shell">
     <section class="hero" aria-labelledby="page-title">
       <div class="hero__copy">
-        <span class="eyebrow red">PROCESSAMENTO LOCAL</span>
         <h1 id="page-title">Gerar plano de fogo realizado</h1>
-        <p>Reúna as entradas do mesmo desmonte, valide os dados e baixe o Excel rastreável.</p>
       </div>
       <div class="status" role="status" aria-live="polite">
         <span id="status-dot" aria-hidden="true"></span>
@@ -35,32 +33,30 @@
         <span class="summary-icon" aria-hidden="true">i</span>
         <span>
           <strong id="input-tutorial-title">O que anexar</strong>
-          <span class="summary-note">Arquivos do mesmo plano · Historial da BMO recomendado</span>
         </span>
         <span class="summary-chevron" aria-hidden="true">⌄</span>
       </summary>
       <div class="input-tutorial__body">
-        <p class="input-tutorial__lead">Todos os arquivos devem pertencer ao mesmo plano.</p>
         <ol class="input-tutorial__list">
           <li class="input-tutorial__item">
             <span class="number">01</span>
-            <div><strong>Config Final.csv</strong><span>Temporização e carga executadas.</span></div>
+            <div><strong>Config Final.csv</strong></div>
           </li>
           <li class="input-tutorial__item">
             <span class="number">02</span>
-            <div><strong>Projeto Completo.csv</strong><span>Dados de QAQC do O-PitSurface.</span></div>
+            <div><strong>Projeto Completo.csv</strong></div>
           </li>
           <li class="input-tutorial__item">
             <span class="number">03</span>
-            <div><strong>Historial da BMO</strong><span><code>.txt</code> ou <code>.log</code> com <code>[Fire]</code>; opcional na execução forçada.</span></div>
+            <div><strong>Historial da BMO</strong><span>Opcional na execução forçada</span></div>
           </li>
           <li class="input-tutorial__item">
             <span class="number">04</span>
-            <div><strong>Plano de Perfuração.xlsx</strong><span>Planilha correspondente ao desmonte.</span></div>
+            <div><strong>Plano de Perfuração.xlsx</strong></div>
           </li>
           <li class="input-tutorial__item">
             <span class="number">05</span>
-            <div><strong>Plano de Perfuração.pdf</strong><span>Conferência do plano de perfuração.</span></div>
+            <div><strong>Plano de Perfuração.pdf</strong></div>
           </li>
         </ol>
       </div>
@@ -72,14 +68,13 @@
           <span class="step-label">Etapa 1</span>
           <h2 id="workspace-title">Anexe os arquivos</h2>
         </div>
-        <span class="workspace__hint">O processamento acontece neste navegador.</span>
       </div>
 
       <label id="dropzone" class="dropzone" for="inputs">
         <input id="inputs" name="inputs" type="file" multiple accept=".csv,.xlsx,.xlsm,.pdf,.txt,.log,.brex" required>
         <span class="upload-icon" aria-hidden="true">↑</span>
         <strong>Escolha os arquivos do plano</strong>
-        <span class="hint">Arraste aqui ou clique para selecionar · CSV, XLSX, XLSM, PDF, TXT, LOG ou BREX (o BREX é lido automaticamente, não é anexo)</span>
+        <span class="hint">Arraste ou clique para selecionar · CSV, XLSX, PDF, TXT ou LOG</span>
       </label>
       <div id="file-list" class="file-list" aria-live="polite"><span>Nenhum arquivo selecionado</span></div>
 
@@ -89,30 +84,26 @@
             <span class="step-label">Etapa 2</span>
             <h2 id="options-title">Identificação e horário</h2>
           </div>
-          <span class="workspace__hint">A identificação é opcional. Sem HISTO, informe a data e o horário do desmonte.</span>
         </div>
 
         <div class="field-grid">
           <fieldset class="plan-identity-settings">
             <legend>Identificação</legend>
-            <label for="plan-identity">ID / nome do plano de fogo em trabalho</label>
-            <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou REG CRISTA F3" aria-describedby="plan-identity-help">
-            <p id="plan-identity-help" class="field-help">Opcional. Aceita número (PP440726) ou nome (REG CRISTA F3); o texto é gravado no Excel como digitado. Sem ID, usa o dos anexos ou o nome do PDF.</p>
+            <label for="plan-identity">ID / nome do plano de fogo em trabalho <span class="label-note">(opcional)</span></label>
+            <input id="plan-identity" name="planIdentity" type="text" autocomplete="off" placeholder="Ex.: PP440726 ou REG CRISTA F3">
           </fieldset>
 
           <fieldset class="fire-time-settings">
             <legend>Data e horário</legend>
             <label for="manual-fire-date">Data local do desmonte <span class="label-note">(obrigatória sem HISTO)</span></label>
-            <input id="manual-fire-date" name="manualFireDate" type="date" autocomplete="off" aria-describedby="manual-fire-date-help manual-fire-date-error">
-            <p id="manual-fire-date-help" class="field-help">Informe ou corrija a data do desmonte. Ao selecionar um disparo BREX, a data é preenchida automaticamente. Com HISTO, deixe em branco para usar a data do evento.</p>
+            <input id="manual-fire-date" name="manualFireDate" type="date" autocomplete="off" aria-describedby="manual-fire-date-error">
             <p id="manual-fire-date-error" class="field-error" role="alert" hidden></p>
             <label for="manual-fire-time">Horário local do desmonte <span class="label-note">(obrigatório sem o Historial da BMO)</span></label>
             <div class="fire-time-row">
-              <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-help manual-fire-time-error">
+              <input id="manual-fire-time" name="manualFireTime" type="time" step="1" autocomplete="off" aria-describedby="manual-fire-time-error">
               <button id="brex-import-button" class="brex-import-button" type="button" aria-controls="brex-panel">Importar BREX (BMO)</button>
               <input id="brex-file" name="brexFile" type="file" accept=".brex" multiple hidden>
             </div>
-            <p id="manual-fire-time-help" class="field-help">Usado quando o HISTO não for anexado ou não trouxer um <code>[Fire]</code> legível.</p>
             <p id="manual-fire-time-error" class="field-error" role="alert" hidden></p>
             <p id="brex-import-error" class="field-error" role="alert" hidden></p>
           </fieldset>
@@ -126,7 +117,7 @@
           <div class="brex-panel__offset">
             <label for="brex-offset-hours">Ajuste do horário do BMO <span>(horas)</span></label>
             <input id="brex-offset-hours" name="brexOffsetHours" type="number" step="1" inputmode="numeric" autocomplete="off" aria-describedby="brex-offset-help brex-offset-error">
-            <p id="brex-offset-help" class="field-help">O BMO grava em UTC; o padrão -3 converte para o horário de Brasília. O ajuste vale para todos os horários listados.</p>
+            <p id="brex-offset-help" class="field-help">O BMO grava em UTC; -3 converte para Brasília.</p>
             <p id="brex-offset-error" class="field-error" role="alert" hidden></p>
           </div>
           <p id="brex-status" class="brex-panel__status" role="status" aria-live="polite"></p>
@@ -143,12 +134,11 @@
             <fieldset class="timezone-settings">
               <legend>Conversão de horário</legend>
               <label for="timezone-offset">Fuso horário gravado no Excel</label>
-              <select id="timezone-offset" name="timezoneOffset" aria-describedby="timezone-help">
+              <select id="timezone-offset" name="timezoneOffset">
                 <option value="-03:00" selected>UTC-03:00 (Brasília)</option>
                 <option value="+00:00">UTC+00:00 (UTC)</option>
                 <option value="none">Não converter (horário original do HISTO)</option>
               </select>
-              <p id="timezone-help" class="field-help">Aplica-se somente ao horário lido do HISTO.</p>
             </fieldset>
 
             <fieldset class="charge-target">
@@ -163,7 +153,7 @@
                   <div class="charge-target__field">
                     <label for="charge-target-input">Total desejado <span>(kg)</span></label>
                     <div class="charge-target__input-wrap">
-                      <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-help charge-target-error">
+                      <input id="charge-target-input" name="chargeTarget" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 17136,05" aria-describedby="charge-target-error">
                       <span aria-hidden="true">kg</span>
                     </div>
                     <p id="charge-target-error" class="field-error" role="alert" hidden></p>
@@ -171,19 +161,18 @@
                   <div class="charge-target__field">
                     <label for="charge-minimum-input">Carga mínima por furo <span>(kg)</span></label>
                     <div class="charge-target__input-wrap">
-                      <input id="charge-minimum-input" name="chargeMinimum" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 0,50" aria-describedby="charge-target-help charge-minimum-error">
+                      <input id="charge-minimum-input" name="chargeMinimum" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex.: 0,50" aria-describedby="charge-minimum-error">
                       <span aria-hidden="true">kg</span>
                     </div>
                     <p id="charge-minimum-error" class="field-error" role="alert" hidden></p>
                   </div>
                   <div class="charge-target__field charge-target__field--hole">
                     <label for="charge-minimum-hole-id">ID do furo de menor carga</label>
-                    <input id="charge-minimum-hole-id" name="chargeMinimumHoleId" type="text" inputmode="numeric" autocomplete="off" placeholder="Ex.: 245" aria-describedby="charge-target-help charge-minimum-hole-error">
+                    <input id="charge-minimum-hole-id" name="chargeMinimumHoleId" type="text" inputmode="numeric" autocomplete="off" placeholder="Ex.: 245" aria-describedby="charge-minimum-hole-error">
                     <p id="charge-minimum-hole-error" class="field-error" role="alert" hidden></p>
                   </div>
                 </div>
-                <p id="charge-target-help" class="field-help">O ID informado receberá exatamente o mínimo. Os demais furos serão ajustados em todo o plano, dentro desse mínimo e da maior carga existente.</p>
-                <p class="charge-target__preserved"><strong>Máximo preservado:</strong> a maior carga já registrada na planilha será mantida exatamente; não é necessário informá-la.</p>
+                <p class="charge-target__preserved"><strong>Máximo preservado:</strong> a maior carga da planilha, mantida sem alteração.</p>
               </div>
             </fieldset>
 
@@ -195,10 +184,9 @@
               </label>
               <div id="signature-hole-settings" class="signature-hole__settings" hidden>
                 <label for="signature-hole-id">ID do furo de assinatura</label>
-                <input id="signature-hole-id" name="signatureHoleId" type="text" inputmode="numeric" list="signature-hole-options" autocomplete="off" placeholder="Escolha ou digite, ex.: 245" aria-describedby="signature-hole-help signature-hole-error">
+                <input id="signature-hole-id" name="signatureHoleId" type="text" inputmode="numeric" list="signature-hole-options" autocomplete="off" placeholder="Escolha ou digite, ex.: 245" aria-describedby="signature-hole-error">
                 <datalist id="signature-hole-options"></datalist>
                 <p id="signature-hole-error" class="field-error" role="alert" hidden></p>
-                <p id="signature-hole-help" class="field-help">Use o número do furo como aparece no Config Final; a lista traz os furos do plano depois de anexar o Config Final. A carga e o tampão desse furo não recebem ajustes automáticos (redistribuição, carga-alvo e variação). Conversões, arredondamentos, tempo e cota seguem a regra normal dos demais furos.</p>
               </div>
             </fieldset>
           </div>
@@ -206,9 +194,9 @@
       </section>
 
       <div class="generation-actions">
-        <button id="submit" type="submit">Validar e gerar Excel <span aria-hidden="true">→</span></button>
-        <button id="force-submit" class="force-submit" type="button" title="Forçar execução" aria-describedby="force-help" disabled>Forçar execução <span aria-hidden="true">→</span></button>
-        <p id="force-help" class="field-help force-help">Use só quando o contexto explicar a divergência. Sem o Historial da BMO, informe a data e o horário acima.</p>
+        <button id="submit" type="submit">Validar e gerar Excel</button>
+        <button id="force-submit" class="force-submit" type="button" aria-describedby="force-help" disabled>Forçar execução</button>
+        <p id="force-help" class="field-help force-help">Use somente quando o contexto explicar a divergência.</p>
       </div>
 
       <div id="progress" class="progress" hidden aria-live="polite">
@@ -221,21 +209,18 @@
 
     <details id="models" class="models">
       <summary>
-        <span>
-          <strong>Modelos de apoio</strong>
-          <span>Baixe uma planilha-base antes de começar, se necessário.</span>
-        </span>
+        <strong>Modelos de apoio</strong>
         <span class="summary-chevron" aria-hidden="true">⌄</span>
       </summary>
       <div class="models__downloads">
-        <a class="download model-download" href="./modelos/Plano%20de%20Fogo%20-%20PC.xls" download="Plano de Fogo - PC.xls" aria-label="Baixar Modelo - Pré-Corte - SEM FUROS">
-          <span>Modelo - Pré-Corte - SEM FUROS</span><span aria-hidden="true">↓</span>
+        <a class="download download--secondary model-download" href="./modelos/Plano%20de%20Fogo%20-%20PC.xls" download="Plano de Fogo - PC.xls" aria-label="Baixar modelo Pré-Corte, sem furos">
+          <span>Pré-Corte · sem furos</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg>
         </a>
-        <a class="download model-download" href="./modelos/Plano%20de%20Fogo%20Realizado%20-%20PP.xlsx" download="Plano de Fogo Realizado - PP.xlsx" aria-label="Baixar Modelo - Produção">
-          <span>Modelo - Produção</span><span aria-hidden="true">↓</span>
+        <a class="download download--secondary model-download" href="./modelos/Plano%20de%20Fogo%20Realizado%20-%20PP.xlsx" download="Plano de Fogo Realizado - PP.xlsx" aria-label="Baixar modelo de Produção">
+          <span>Produção</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg>
         </a>
-        <a class="download model-download" href="./modelos/Plano%20Realizado%20-%20REG%20.xls" download="Plano Realizado - REG .xls" aria-label="Baixar Modelo - Regularização">
-          <span>Modelo - Regularização</span><span aria-hidden="true">↓</span>
+        <a class="download download--secondary model-download" href="./modelos/Plano%20Realizado%20-%20REG%20.xls" download="Plano Realizado - REG .xls" aria-label="Baixar modelo de Regularização">
+          <span>Regularização</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg>
         </a>
       </div>
     </details>
@@ -255,6 +240,6 @@
   <script src="./elevation.js?v=20261110-signature-rule"></script>
   <script src="./signature-hole.js?v=20261110-signature-rule"></script>
   <script src="./stemming.js?v=20261110-signature-rule"></script>
-  <script src="./app.js?v=20261110-signature-rule"></script>
+  <script src="./app.js?v=20261112-clean-ui"></script>
 </body>
 </html>

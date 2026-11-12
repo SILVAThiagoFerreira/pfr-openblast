@@ -151,12 +151,22 @@ function setProgress(value, label) {
   progressBar.style.width = `${percent}%`;
 }
 
+const DOWNLOAD_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg>';
+
+// Conteúdo fixo de botão de download: ícone SVG estático + rótulo em texto puro.
+function setDownloadContent(link, label) {
+  const text = document.createElement('span');
+  text.textContent = label;
+  link.innerHTML = DOWNLOAD_ICON_SVG;
+  link.append(text);
+}
+
 function addLogDownload(container, text) {
   const link = document.createElement('a');
-  link.className = 'download log-download';
+  link.className = 'download download--secondary log-download';
   link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   link.download = 'openblast-log-erro.txt';
-  link.textContent = 'Baixar log local (.txt) →';
+  setDownloadContent(link, 'Baixar log local');
   container.append(link);
 }
 
@@ -849,7 +859,7 @@ async function runGeneration(force = false) {
     const bytes = XLSX.write(generated.workbook, { bookType: 'xlsx', type: 'array' });
     const link = document.createElement('a');
     link.className = 'download'; link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    link.download = filename; link.textContent = 'Baixar plano realizado (.xlsx) →';
+    link.download = filename; setDownloadContent(link, 'Baixar plano realizado');
     result.className = 'result'; result.replaceChildren();
     const title = document.createElement('h3');
     title.textContent = generated.event.forced

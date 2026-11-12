@@ -67,6 +67,8 @@ O arquivo `public/config.js` mantém `window.PFR_API_BASE` vazio para impedir qu
 
 O fluxo público é organizado em uma única área operacional: o tutorial dos cinco tipos de entrada, as opções de saída e os modelos de apoio ficam recolhíveis para manter a tela compacta. A identificação e o horário permanecem visíveis, enquanto fuso e distribuição de carga ficam em opções avançadas. Os anexos continuam incrementais e o log considera a lista completa de arquivos já adicionados.
 
+Os textos de apoio foram reduzidos ao necessário: o tutorial mostra só os nomes dos cinco arquivos, e os rótulos, avisos e mensagens de validação permanecem. Os botões de download (plano realizado, log local e modelos de apoio) usam o estilo dos botões de ação, com ícone e sem setas. Os relatórios gerados (Excel, aba Resumo e log) não foram alterados.
+
 A seção **Modelos de apoio** publica os três arquivos oficiais com os nomes originais preservados no download: `Plano de Fogo - PC.xls` (Pré-Corte - SEM FUROS), `Plano de Fogo Realizado - PP.xlsx` (Produção) e `Plano Realizado - REG .xls` (Regularização).
 
 ## Importação do BREX (BMO)
