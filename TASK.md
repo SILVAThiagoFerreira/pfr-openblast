@@ -92,7 +92,7 @@ Pendências:
 Motivo: a página tinha textos de apoio repetidos (eyebrow, subtítulos, dicas de campo e descrições dos cinco arquivos) e os botões de download apareciam como links pequenos com seta ("Baixar plano realizado (.xlsx) →"), sem peso visual de botão.
 
 Escopo (somente interface pública, `public/` espelhado em `docs/`):
-- Removidos textos redundantes: eyebrow e parágrafo do topo, hint "O processamento acontece neste navegador", hint das etapas, textos de ajuda de identificação, data, horário, fuso, carga-alvo, furo de assinatura e Forçar execução, subtítulo de Modelos de apoio, descrições do tutorial de anexos.
+- Removidos textos redundantes: eyebrow e parágrafo do topo, hint "O processamento acontece neste navegador", hint das etapas, textos de ajuda de identificação, data, horário, fuso, carga-alvo e furo de assinatura, subtítulo de Modelos de apoio, descrições do tutorial de anexos. O texto de ajuda de Forçar execução foi encurtado.
 - Mantidos: nomes dos cinco arquivos, rótulos de campos, nota "obrigatório sem o Historial da BMO", linha "Máximo preservado", mensagens de validação e avisos.
 - Botões: setas "→" e "↓" removidas. "Baixar plano realizado" e "Baixar log local" usam `.download` com ícone SVG (estilo primário e secundário). Modelos de apoio usam `.download--secondary` e o rótulo sem o prefixo "Modelo - ".
 - Relatórios não alterados: Excel (incluindo aba `Resumo`), log de erro e regras de processamento não foram tocados.

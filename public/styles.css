@@ -828,7 +828,7 @@ button:hover { background: #9a0f17; }
 .result { padding: 18px 0 0; }
 .metric { border: 0; border-top: 1px solid #e3e3e3; border-bottom: 0; background: transparent; box-shadow: none; }
 .models > summary { padding: 12px 0; }
-.models__downloads { padding-bottom: 6px; }
+.models__downloads { padding: 0 0 6px; }
 footer {
   border-top: 1px solid #3d4148;
   padding: 12px 0 20px;
