@@ -36,6 +36,7 @@ Gerar um Excel de plano de fogo realizado a partir dos arquivos operacionais PP,
 - Os demais furos livres (acima do mínimo, exceto o furo de assinatura e os de maior carga) absorvem a diferença do total com valores distintos, entre um piso e um teto escalonados (teto logo abaixo do máximo preservado). Se o total não couber só com esses furos, os furos de carga baixa também sobem, proporcionalmente, e o resultado avisa.
 - Cargas de origem iguais acima do mínimo são separadas por 0,001 kg. A resolução interna é de 1e-6 kg e o total fecha exatamente.
 - Só são recusados os alvos que não permitem cargas distintas (muito perto do menor ou do maior valor possível), com mensagem explícita. Não há carga repetida silenciosa.
+- CLI Python (`src/pfr/charge_distribution.py`): mesma regra e mesmos valores do site, verificados por `tests/test_charge_parity.py` contra a referência JavaScript. A redistribuição padrão de zeros preserva o total de entrada; `business.charge_total_target_kg` só é usado quando `enforce_charge_total_target` está ativo.
 - Ao anexar um `Config Final` legível, o site sugere automaticamente a menor carga positiva de `InputedCharge` e o primeiro `Number` correspondente nos campos de carga mínima e ID mínimo. Valores editados pelo usuário não são sobrescritos.
 - `X` e `Y` são preenchidos a partir do arquivo final e, se faltarem, do arquivo de projeto.
 - `Z (crest)` e `Z (toe)` são cotas (elevação, em metros) e seguem a seção "Cota (Z) do realizado".

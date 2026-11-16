@@ -13,6 +13,7 @@ from pypdf import PdfReader
 
 from .io import read_table, read_text
 from .validation import validate_signature_hole
+from .charge_distribution import ChargeDistributionError, distribute_charges, redistribute_zero_charges
 
 
 def _series_or_na(df: pd.DataFrame, column: str) -> pd.Series:
@@ -144,215 +145,107 @@ def _apply_stemming_variation(
     return varied, count
 
 
+def _business_number(cfg: dict, key: str) -> float:
+    """Lê business.<key> obrigatório; valor ausente ou não numérico gera erro explícito (sem padrão escondido)."""
+    business = cfg.get("business", {})
+    if key not in business:
+        raise ValueError(f"business.{key} é obrigatório em config.yaml para esta configuração de carga.")
+    value = business[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"business.{key} deve ser um número em config.yaml.")
+    return float(value)
+
+
+def _charge_list(charges: pd.Series) -> list[float | None]:
+    """Cargas como lista; vazio vira None. Seis casas decimais, como a resolução do site."""
+    numbers = pd.to_numeric(charges, errors="coerce").astype(float)
+    return [None if pd.isna(value) else round(float(value), 6) for value in numbers]
+
+
+def _fixed_positions(values: pd.Series, preserved: pd.Series | None) -> list[int]:
+    if preserved is None:
+        return []
+    flags = preserved.reindex(values.index, fill_value=False).astype(bool).to_numpy()
+    return [position for position, flag in enumerate(flags) if flag]
+
+
 def _redistribute_zero_charges(
     charges: pd.Series,
-    enabled: bool,
-    target_total: float | None,
-    minimum_zero_charge: float,
+    cfg: dict,
     preserved: pd.Series | None = None,
-) -> tuple[pd.Series, int]:
+) -> tuple[pd.Series, int, list[str]]:
+    """Redistribuição padrão de zeros (mesma regra do site: escada para zerados, valores distintos, total exato)."""
     values = pd.to_numeric(charges, errors="coerce").astype(float)
-    if not enabled:
-        return values, 0
-
-    fixed = (
-        preserved.reindex(values.index, fill_value=False).astype(bool)
-        if preserved is not None
-        else pd.Series(False, index=values.index, dtype=bool)
-    )
-    # Furo de assinatura com carga zero permanece zero: não recebe a carga mínima de furos zerados.
-    zero_mask = values.eq(0) & ~fixed
-    zero_count = int(zero_mask.sum())
-    if zero_count == 0:
-        return values, 0
-
-    if target_total is None:
-        raise ValueError(
-            "Foram encontrados furos com carga zerada. Defina business.charge_total_target_kg para redistribuir a carga sem alterar o total."
+    if not cfg.get("business", {}).get("redistribute_zero_charges", False):
+        return values, 0, []
+    raw = _charge_list(values)
+    fixed = _fixed_positions(values, preserved)
+    fixed_set = set(fixed)
+    zero_count = sum(1 for position, value in enumerate(raw) if value == 0 and position not in fixed_set)
+    notes: list[str] = []
+    try:
+        distributed = redistribute_zero_charges(
+            raw,
+            enabled=True,
+            zero_minimum=_business_number(cfg, "charge_zero_fill_min_kg"),
+            zero_step_kg=_business_number(cfg, "charge_zero_fill_step_kg"),
+            fixed_indexes=fixed,
+            notes=notes,
         )
-
-    target_total = float(target_total)
-    if target_total <= 0:
-        raise ValueError("business.charge_total_target_kg deve ser maior que zero quando houver furos com carga zerada.")
-
-    non_zero_mask = values.notna() & ~values.eq(0)
-    if non_zero_mask.sum() < 3:
-        raise ValueError("Nao ha furos suficientes para redistribuir a carga preservando o menor e o maior valor.")
-
-    min_idx = values[non_zero_mask].idxmin()
-    max_idx = values[non_zero_mask].idxmax()
-
-    redistribution_targets = zero_mask.copy()
-    redistribution_targets.loc[min_idx] = False
-    redistribution_targets.loc[max_idx] = False
-
-    adjustable_mask = non_zero_mask & ~values.index.isin([min_idx, max_idx]) & ~fixed
-    adjustable_total = float(values[adjustable_mask].sum())
-    if adjustable_total <= 0:
-        raise ValueError("Nao foi possivel redistribuir a carga sem alterar o menor e o maior valor.")
-
-    zero_allocation = minimum_zero_charge * zero_count
-    if zero_allocation <= 0:
-        raise ValueError("business.charge_zero_fill_min_kg deve ser maior que zero quando houver furos com carga zerada.")
-
-    if zero_allocation >= target_total:
-        raise ValueError("A carga minima configurada para furos zerados excede o total alvo.")
-
-    result = values.copy()
-    result.loc[zero_mask] = minimum_zero_charge
-
-    delta = zero_allocation
-    if delta > adjustable_total:
-        raise ValueError(
-            "A redistribuicao solicitada excede a carga disponivel nos furos ajustaveis preservando os extremos."
-        )
-
-    adjustable_values = result[adjustable_mask]
-    weights = adjustable_values / adjustable_values.sum()
-    result.loc[adjustable_mask] = adjustable_values - (weights * delta)
-
-    result = result.round(3)
-    if (result < 0).any():
-        raise ValueError("A redistribuicao gerou carga negativa em pelo menos um furo.")
-    original_total = float(values.sum())
-    current_total = float(result.sum())
-    remainder = round(original_total - current_total, 3)
-    if abs(remainder) > 0:
-        correction_candidates = result[adjustable_mask].sort_values(ascending=False)
-        if correction_candidates.empty:
-            raise ValueError("Nao foi possivel aplicar a correção final da carga sem alterar os extremos.")
-        correction_idx = correction_candidates.index[0]
-        result.loc[correction_idx] = round(result.loc[correction_idx] + remainder, 3)
-
-    if result.loc[min_idx] != values.loc[min_idx] or result.loc[max_idx] != values.loc[max_idx]:
-        raise ValueError("A redistribuicao alterou indevidamente o menor ou o maior valor de carga.")
-
-    return result, zero_count
-
-
-def _rebalance_adjustable_values(
-    values: pd.Series,
-    delta: float,
-    lower_bound: float,
-    upper_bound: float,
-) -> pd.Series:
-    result = pd.to_numeric(values, errors="coerce").astype(float).copy()
-    tolerance = 1e-9
-    if abs(delta) <= tolerance:
-        return result
-
-    if delta > 0:
-        remaining = float(delta)
-        while remaining > tolerance:
-            capacity = (upper_bound - result).clip(lower=0)
-            candidates = capacity[capacity > tolerance]
-            if candidates.empty:
-                raise ValueError("Nao ha folga suficiente para elevar a carga total sem ultrapassar o maior valor preservado.")
-            weights = result.loc[candidates.index].clip(lower=tolerance)
-            if float(weights.sum()) <= tolerance:
-                weights = pd.Series(1.0, index=candidates.index)
-            weights = weights / float(weights.sum())
-            proposal = weights * remaining
-            applied = pd.concat([proposal, candidates], axis=1).min(axis=1)
-            consumed = float(applied.sum())
-            if consumed <= tolerance:
-                raise ValueError("Nao foi possivel distribuir o acrescimo de carga dentro dos limites configurados.")
-            result.loc[applied.index] = result.loc[applied.index] + applied
-            remaining -= consumed
-        return result
-
-    remaining = float(-delta)
-    while remaining > tolerance:
-        capacity = (result - lower_bound).clip(lower=0)
-        candidates = capacity[capacity > tolerance]
-        if candidates.empty:
-            raise ValueError("Nao ha carga suficiente para reduzir o total sem ultrapassar o menor valor preservado.")
-        weights = result.loc[candidates.index].clip(lower=tolerance)
-        if float(weights.sum()) <= tolerance:
-            weights = candidates
-        weights = weights / float(weights.sum())
-        proposal = weights * remaining
-        applied = pd.concat([proposal, candidates], axis=1).min(axis=1)
-        consumed = float(applied.sum())
-        if consumed <= tolerance:
-            raise ValueError("Nao foi possivel distribuir a reducao de carga dentro dos limites configurados.")
-        result.loc[applied.index] = result.loc[applied.index] - applied
-        remaining -= consumed
-    return result
+    except ChargeDistributionError as error:
+        raise ValueError(f"Redistribuição de cargas zeradas: {error}") from error
+    return pd.Series(distributed, index=values.index, dtype=float), zero_count, notes
 
 
 def _enforce_charge_total_target(
     charges: pd.Series,
-    enabled: bool,
-    target_total: float | None,
+    cfg: dict,
     preserved: pd.Series | None = None,
-) -> tuple[pd.Series, bool]:
+) -> tuple[pd.Series, bool, list[str]]:
+    """Fecha o total em business.charge_total_target_kg (mesma regra da carga-alvo do site)."""
     values = pd.to_numeric(charges, errors="coerce").astype(float)
-    if not enabled or target_total is None:
-        return values, False
-
-    fixed = (
-        preserved.reindex(values.index, fill_value=False).astype(bool)
-        if preserved is not None
-        else pd.Series(False, index=values.index, dtype=bool)
-    )
-    valid = values.dropna()
-    if valid.empty:
-        return values, False
-
-    target_total = float(target_total)
-    current_total = float(valid.sum())
-    delta = round(target_total - current_total, 6)
-    if abs(delta) < 0.0005:
-        return values, False
-
-    if len(valid) < 3:
-        raise ValueError("Sao necessarios pelo menos 3 furos com carga valida para fechar o total preservando os extremos.")
-
-    ordered = valid.sort_values(kind="mergesort")
-    min_idx = ordered.index[0]
-    max_idx = ordered.index[-1]
-    if min_idx == max_idx:
-        raise ValueError("Nao foi possivel identificar furos distintos para preservar o menor e o maior valor de carga.")
-
-    lower_bound = float(ordered.iloc[0])
-    upper_bound = float(ordered.iloc[-1])
-    adjustable_mask = values.notna() & ~values.index.isin([min_idx, max_idx]) & ~fixed
-    adjustable = values.loc[adjustable_mask]
-    if adjustable.empty:
-        raise ValueError("Nao ha furos ajustaveis para fechar a carga total preservando os extremos.")
-
-    adjusted = _rebalance_adjustable_values(adjustable, delta, lower_bound, upper_bound)
-    result = values.copy()
-    result.loc[adjustable.index] = adjusted
-    result = result.round(3)
-
-    if (result.loc[adjustable.index] < lower_bound - 0.001).any():
-        raise ValueError("O fechamento da carga criou valor abaixo do menor limite preservado.")
-    if (result.loc[adjustable.index] > upper_bound + 0.001).any():
-        raise ValueError("O fechamento da carga criou valor acima do maior limite preservado.")
-
-    current_total = float(result.dropna().sum())
-    remainder = round(target_total - current_total, 3)
-    if abs(remainder) > 0:
-        if remainder > 0:
-            candidates = result.loc[adjustable.index][result.loc[adjustable.index] < upper_bound - 0.001].sort_values(ascending=False)
-        else:
-            candidates = result.loc[adjustable.index][result.loc[adjustable.index] > lower_bound + 0.001].sort_values(ascending=False)
-        if candidates.empty:
-            raise ValueError("Nao foi possivel aplicar a correção final da carga preservando os extremos.")
-        correction_idx = candidates.index[0]
-        corrected_value = round(result.loc[correction_idx] + remainder, 3)
-        if corrected_value < lower_bound - 0.001 or corrected_value > upper_bound + 0.001:
-            raise ValueError("A correção final da carga violou os limites preservados.")
-        result.loc[correction_idx] = corrected_value
-
-    if round(float(result.loc[min_idx]), 3) != round(lower_bound, 3):
-        raise ValueError("O fechamento da carga alterou o menor valor preservado.")
-    if round(float(result.loc[max_idx]), 3) != round(upper_bound, 3):
-        raise ValueError("O fechamento da carga alterou o maior valor preservado.")
-
-    return result, True
+    business = cfg.get("business", {})
+    if not business.get("enforce_charge_total_target", False):
+        return values, False, []
+    if business.get("charge_total_target_kg") is None:
+        raise ValueError("business.charge_total_target_kg é obrigatório quando enforce_charge_total_target está ativo.")
+    target = _business_number(cfg, "charge_total_target_kg")
+    raw = _charge_list(values)
+    positions = [position for position, value in enumerate(raw) if value is not None]
+    if len(positions) < 3:
+        raise ValueError("São necessários pelo menos 3 furos com carga válida para fechar o total preservando os extremos.")
+    fixed_positions = set(_fixed_positions(values, preserved))
+    subset = [raw[position] for position in positions]
+    subset_fixed = [k for k, position in enumerate(positions) if position in fixed_positions]
+    adjustable_subset = [value for k, value in enumerate(subset) if k not in subset_fixed]
+    if not adjustable_subset:
+        raise ValueError("Não há furos ajustáveis para fechar a carga-alvo: todos os furos com carga são de assinatura.")
+    lowest = min(adjustable_subset)
+    highest = max(subset)
+    minimum_index = next(k for k, value in enumerate(subset) if value == lowest and k not in subset_fixed)
+    if lowest <= 0:
+        raise ValueError("A carga-alvo não pode ser distribuída com furo de carga zero sem redistribuir os zerados: ative business.redistribute_zero_charges.")
+    maximum_indexes = [k for k, value in enumerate(subset) if value == highest]
+    notes: list[str] = []
+    try:
+        distributed = distribute_charges(
+            subset,
+            target,
+            step_kg=_business_number(cfg, "charge_minimum_step_kg"),
+            minimum_index=minimum_index,
+            minimum_value=lowest,
+            maximum_index=maximum_indexes[0],
+            maximum_value=highest,
+            maximum_indexes=maximum_indexes,
+            fixed_indexes=subset_fixed,
+            notes=notes,
+        )
+    except ChargeDistributionError as error:
+        raise ValueError(f"Carga-alvo: {error}") from error
+    adjusted = values.copy()
+    for k, position in enumerate(positions):
+        adjusted.iat[position] = distributed[k]
+    return adjusted, True, notes
 
 
 def _extract_plan_id_from_input_files(cfg: dict, sources) -> str | None:
@@ -806,19 +699,9 @@ def build_output_frame(
     merged.attrs["signature_hole_count"] = int(preserved.sum())
 
     charge_raw = _series_or_na(merged, "r_explosive")
-    charge_values, zero_charge_count = _redistribute_zero_charges(
-        charge_raw,
-        cfg["business"].get("redistribute_zero_charges", False),
-        cfg["business"].get("charge_total_target_kg"),
-        float(cfg["business"].get("charge_zero_fill_min_kg", 0.01)),
-        preserved,
-    )
-    charge_values, charge_total_adjusted = _enforce_charge_total_target(
-        charge_values,
-        cfg["business"].get("enforce_charge_total_target", False),
-        cfg["business"].get("charge_total_target_kg"),
-        preserved,
-    )
+    charge_values, zero_charge_count, zero_notes = _redistribute_zero_charges(charge_raw, cfg, preserved)
+    charge_values, charge_total_adjusted, enforce_notes = _enforce_charge_total_target(charge_values, cfg, preserved)
+    charge_notes = [*zero_notes, *enforce_notes]
     charge_values = charge_values.where(~preserved, charge_raw)
     data = pd.DataFrame(
         {
@@ -847,6 +730,7 @@ def build_output_frame(
     if zero_charge_count:
         merged.attrs["zero_charge_count"] = zero_charge_count
     merged.attrs["charge_total_adjusted"] = charge_total_adjusted
+    merged.attrs["charge_notes"] = charge_notes
     return data
 
 

@@ -103,6 +103,8 @@ def run(
         logger.info("Variação de tampao aplicada em %s furos", merged.attrs["stemming_variation_count"])
     if merged.attrs.get("charge_total_adjusted", False):
         logger.info("Carga total ajustada para %s kg preservando os extremos", cfg["business"].get("charge_total_target_kg"))
+    for note in merged.attrs.get("charge_notes", []):
+        logger.info("Carga: %s", note)
     if merged.attrs.get("signature_hole_count", 0):
         logger.info(
             "Furo de assinatura %s: carga e tampao sem ajustes automaticos (redistribuicao, carga-alvo e variacao); "
