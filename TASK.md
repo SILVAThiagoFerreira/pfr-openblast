@@ -98,3 +98,30 @@ Escopo (somente interface pública, `public/` espelhado em `docs/`):
 - Relatórios não alterados: Excel (incluindo aba `Resumo`), log de erro e regras de processamento não foram tocados.
 
 Testes: `tests/test_frontend.js` (espelho `docs/`, nomes dos modelos e textos de contrato), suíte completa em `tests/*.js` e `tests/*.py`.
+
+## Atualização: cargas iguais na carga mínima (site)
+Motivo: ao informar a carga mínima por furo, dezenas de furos saíam exatamente com o mínimo (ex.: 269 furos com 21,00 kg num plano com furos zerados), e a distribuição do alvo podia repetir cargas perto do máximo. Pedidos do usuário: nenhuma carga se repete; os furos de carga baixa ficam baixos, variando em decimais; o passo não precisa ser fixo, o sistema escolhe o que representa melhor o cenário sem alterar a realidade; o furo de assinatura e os de maior carga não mudam; os demais podem ser ajustados.
+
+Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), configuração (`business.charge_minimum_step_kg` em `config.yaml`, com teto de 5 kg; `chargeMinimumStepKg` em `public/config.js` e `docs/config.js`), processamento (`public/charge.js`, `distributeCharges`; `public/app.js` passa `stepKg` e recebe os avisos em `notes`), testes e documentação.
+
+- Furos de carga baixa ficam entre o mínimo e a próxima carga real do plano, em escada na ordem da carga original. O passo é o maior que cabe nesse espaço, até o teto configurado. Se não houver espaço, o passo é reduzido e o resultado avisa.
+- Os demais furos livres absorvem a diferença do total com valores distintos entre um piso e um teto escalonados (teto logo abaixo do máximo preservado). Se o total não couber só com eles, os furos de carga baixa sobem proporcionalmente, com aviso.
+- Cargas de origem iguais acima do mínimo são separadas por 0,001 kg. Desempate de 1e-6 kg quando sobra repetição por arredondamento; o total fecha exatamente.
+- Alvos que não permitem cargas distintas (muito perto do menor ou do maior valor possível) são recusados com mensagem explícita.
+- O resultado mostra "Furos na carga mínima" (normalmente 1) e os avisos de passo reduzido e de elevação dos furos baixos.
+- Testes: `tests/test_charge.js` (escada automática abaixo da próxima carga real, aviso de passo reduzido com 60 furos baixos, alvo alto e caso do revisor sem repetição, recusa no limite inferior, varredura de 300 cenários sem repetição), `tests/test_signature_hole.js`, `tests/test_browser_config.py` (espelho da chave), `tests/test_frontend.js` (ligação em `app.js` e `docs/`).
+- Pendências abertas: (1) sem o bloco de carga-alvo, os zerados da redistribuição padrão (`charge_zero_fill_min_kg`) ainda recebem o mesmo valor; (2) achados do revisor na redistribuição padrão de zeros (`redistributeZeroCharges`, pré-existente, não alterada): total com diferença de até 5e-4 kg e valores negativos quando a folga é pequena; no site, a execução sem o bloco de carga-alvo mostrou total 46.779,599748 kg para entrada de 46.779,60 kg.
+
+## Atualização: cargas repetidas na redistribuição padrão (site)
+Motivo: no REG RAMPA F3 (320 furos, 1 zerado), a redistribuição padrão deixava 174 furos com carga repetida em 48 valores (ex.: 22,999977 kg em 11 furos), e o total saía com diferença de 0,000136 kg. Causa: a redistribuição só mexia nos zerados (todos iguais a 0,01 kg) e ajustava os demais na proporção, então cargas de origem iguais continuavam iguais; sem zerados, nada era ajustado. Com o bloco de carga-alvo, a repetição não aparecia.
+
+Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), configuração (`business.charge_zero_fill_step_kg` em `config.yaml`; `zeroChargeStepKg` em `public/config.js` e `docs/config.js`), processamento (`public/charge.js`, `redistributeZeroCharges`; `public/app.js` passa o passo e os avisos e, com o bloco ligado, parte da `InputedCharge` original), testes e documentação.
+
+- Pinados com o valor de entrada: menor carga positiva (o furo de assinatura, se tiver essa carga; senão o primeiro), maior carga (empates) e furo de assinatura. Os zerados ficam em escada a partir de 0,01 kg, em passo de 0,001 kg (reduzido com aviso se não couber abaixo da menor carga positiva).
+- Zerados: escada a partir de 0,01 kg em passo de 0,001 kg (reduzido com aviso se não couber abaixo da menor carga positiva).
+- Demais furos: absorvem a diferença em proporção ao excesso sobre a menor carga; cargas iguais separadas por 0,001 kg; desempate de 1e-6 kg; total exato.
+- Com o bloco ligado, a redistribuição padrão não roda antes do bloco. Rodando antes, os furos de 21 kg exatos subiam acima do mínimo e a escada do bloco com mínimo de 21 kg colapsava para passos de 0,000002 kg.
+- Aviso do bloco: o passo passou a ser mostrado com 6 casas (antes era arredondado para 3: "0,007" no lugar de 0,006666 kg).
+- Testes: `tests/test_charge.js` (caso sintético com as repetições do REG RAMPA F3, 60 zerados, passo reduzido, recusas, furo de assinatura, bloco com mínimo de 3 e de 21 kg, varredura de 200 cenários), `tests/test_signature_hole.js`, `tests/test_browser_config.py` (espelho dos dois passos), `tests/test_frontend.js` (ligação em `app.js` e `docs/`).
+- Resultado no REG RAMPA F3, executando `generateLocally` do `public/app.js` sobre os CSV e o PDF de entrada (somente leitura, saída em rascunho): sem bloco, antes 174 furos repetidos (48 valores) e total 10.008,820136 kg; depois 0 repetidos e total 10.008,82 kg. Com bloco (mínimo 3 kg e 21 kg, alvo = soma da entrada, ID 141): 0 repetidos antes e depois, total 10.008,82 kg.
+- Pendências abertas: (1) a CLI (`src/pfr/processing.py`, `_redistribute_zero_charges`) ainda usa a regra anterior, com a mesma repetição; não foi alterada nesta rodada, que cobre só o site; (2) `chargeTarget` de `public/config.js` deixou de ser lido pela redistribuição padrão (permanece como espelho de `business.charge_total_target_kg`).

@@ -78,8 +78,10 @@ Abas: o furo de assinatura não cria aba nova; a aba `Resumo` continua somente c
 - `tampao realizado` pode receber variação determinística de até `0,12` para mais ou para menos quando habilitado na configuração.
 
 ## Redistribuição de carga zerada
-- Quando existirem furos com `InputedCharge == 0`, a redistribuição deve usar `business.charge_total_target_kg` e `business.charge_zero_fill_min_kg`.
+- Quando existirem furos com `InputedCharge == 0`, a redistribuição deve usar `business.charge_zero_fill_min_kg` como carga mínima da escada (primeiro furo zerado) e, no site, `business.charge_zero_fill_step_kg` como passo. Na CLI, usa `business.charge_total_target_kg` e `business.charge_zero_fill_min_kg`.
+- Site, carga mínima por furo informada: `cargas realizadas` tem até seis casas decimais (resolução interna de 1e-6 kg). O furo de menor carga vale exatamente a carga mínima; os furos preservados valem exatamente a maior carga original; os demais ficam em `(mínimo, máximo)` e não se repetem entre si. Os furos de carga baixa ficam entre o mínimo e a próxima carga real do plano, em passo automático até `business.charge_minimum_step_kg` (padrão 5 kg); a redução do passo e a elevação dos furos baixos aparecem como aviso no resultado.
 - Os furos com menor e maior carga não podem ser alterados.
+- Site, redistribuição padrão (sem o bloco de carga-alvo): `cargas realizadas` tem até seis casas decimais; nenhum valor se repete, salvo empate no maior valor original; o total é igual ao de entrada; o furo de menor carga positiva, os furos de maior carga e o furo de assinatura mantêm o valor de entrada; os zerados ficam em escada a partir de `business.charge_zero_fill_min_kg` com passo `business.charge_zero_fill_step_kg`, abaixo da menor carga positiva; os demais positivos ficam entre a menor carga positiva (inclusive) e o maior valor (exclusive). Avisos: passo reduzido e cargas repetidas separadas (com a quantidade de furos).
 - O total final da coluna deve permanecer idêntico ao total alvo configurado.
 
 ## Fechamento do total de carga

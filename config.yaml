@@ -43,6 +43,15 @@ business:
   redistribute_zero_charges: true
   charge_total_target_kg: 17136.048
   charge_zero_fill_min_kg: 0.01
+  # Passo entre os furos zerados na redistribuição padrão (site, sem bloco de carga-alvo): a escada começa em
+  # charge_zero_fill_min_kg e sobe neste passo, em kg. Se não couber abaixo da menor carga positiva, o passo é
+  # reduzido e o resultado avisa. Espelhado em public/config.js (zeroChargeStepKg); tests/test_browser_config.py.
+  charge_zero_fill_step_kg: 0.001
+  # Carga mínima por furo (site, bloco de carga-alvo): teto do passo, em kg, entre as cargas dos furos de carga
+  # baixa (zerados ou abaixo do mínimo). O sistema escolhe o passo dentro desse teto para que esses furos fiquem
+  # abaixo da próxima carga real do plano e nenhuma carga se repita. Espelhado em public/config.js
+  # (chargeMinimumStepKg); tests/test_browser_config.py verifica a igualdade.
+  charge_minimum_step_kg: 5.0
   output_name_template: "Plano_Fogo_Realizado_PP{plan_id}.xlsx"
   data_sheet_name: "Dados dos Furos"
   summary_sheet_name: "Resumo"

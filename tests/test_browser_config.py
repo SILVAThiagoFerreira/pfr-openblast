@@ -20,6 +20,11 @@ SCALAR_KEYS = {
     "elevation_design_sheet_pattern": "elevationDesignSheetPattern",
     # Furo de assinatura: ID padrão do site (vazio = nenhum furo de assinatura).
     "signature_hole_id": "signatureHoleId",
+    # Carga mínima por furo: passo entre as cargas de carga baixa (nenhuma carga se repete).
+    "charge_minimum_step_kg": "chargeMinimumStepKg",
+    # Carga zerada na redistribuição padrão (site): mínimo da escada e passo entre os zerados.
+    "charge_zero_fill_min_kg": "zeroChargeMinimum",
+    "charge_zero_fill_step_kg": "zeroChargeStepKg",
 }
 LIST_KEYS = {
     "plan_label_generic_names": "planLabelGenericNames",

@@ -631,12 +631,18 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
     throw new Error('O tempo de detonação do furo de assinatura foi imputado; ele não pode ser alterado.');
   }
   const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
-  const baseCharges = window.OpenBlastCharge.redistributeZeroCharges(rawCharges, {
-    enabled: BUSINESS.redistributeZeroCharges,
-    zeroChargeMinimum: BUSINESS.zeroChargeMinimum,
-    chargeTarget: BUSINESS.chargeTarget,
-    fixedIndexes
-  });
+  const chargeNotes = [];
+  // Sem bloco de carga-alvo: redistribuição padrão (zerados em escada e cargas repetidas separadas). Com o bloco, a
+  // distribuição parte da entrada original: os zerados já são furos de carga baixa e sobem para a escada acima do mínimo.
+  const baseCharges = chargeOptions.enabled
+    ? rawCharges
+    : window.OpenBlastCharge.redistributeZeroCharges(rawCharges, {
+      enabled: BUSINESS.redistributeZeroCharges,
+      zeroChargeMinimum: BUSINESS.zeroChargeMinimum,
+      zeroChargeStepKg: BUSINESS.zeroChargeStepKg,
+      fixedIndexes,
+      notes: chargeNotes
+    });
   const positiveIndexes = rawCharges.map((value, index) => value !== null && value > 0 ? index : -1).filter(index => index >= 0);
   let chargeOptionsWithExtremes = chargeOptions;
   let chargeMetadata = null;
@@ -663,7 +669,10 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
       maximumIndex,
       maximumValue,
       maximumIndexes,
-      fixedIndexes
+      fixedIndexes,
+      // Passo entre as cargas de carga baixa (espelho de business.charge_minimum_step_kg). Avisos da distribuição.
+      stepKg: BUSINESS.chargeMinimumStepKg,
+      notes: chargeNotes
     };
     chargeMetadata = { minimumHoleId: numbers[minimumIndex], maximumHoleId: numbers[maximumIndex], maximumValue };
   }
@@ -673,6 +682,10 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
   if (signatureIndex >= 0 && charges[signatureIndex] !== rawCharges[signatureIndex]) {
     throw new Error('A carga do furo de assinatura foi alterada; a entrada deve ser preservada.');
   }
+  const chargeWarnings = chargeNotes;
+  const chargeAtMinimumCount = chargeOptions.enabled
+    ? charges.filter(value => Math.abs(value - chargeOptions.minimum) < 1e-9).length
+    : null;
   const stemming = window.OpenBlastStemming.applyVariation(
     merged.map(row => parseNumber(row.Stemming)),
     numbers,
@@ -698,6 +711,8 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
     return {
       data,
       chargeMetadata,
+      chargeWarnings,
+      chargeAtMinimumCount,
       sourceFinalRows: finalRows.length,
       excludedRows: mergedCandidates.length - merged.length,
       elevationWarnings: elevation.warnings,
@@ -807,7 +822,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
   const warnings = [...(sources.warnings || []), ...identity.warnings, ...outputName.warnings];
   setProgress(62, 'Montando os dados dos furos...');
   const builtRows = await buildRows(projectRows, finalRows, event, chargeOptions, sources.designRows, signatureOptions);
-  warnings.push(...builtRows.elevationWarnings);
+  warnings.push(...builtRows.elevationWarnings, ...builtRows.chargeWarnings);
   const data = builtRows.data;
   if (!data.length) throw new Error('A validação não encontrou furos válidos para exportar.');
   const timing = data.map(row => row['tempo detonacao (ms)']);
@@ -826,6 +841,7 @@ async function generateLocally(files, chargeOptions = {}, timeOptions = {}, plan
     chargeTargetApplied: Boolean(chargeOptions.enabled), chargeTarget: chargeOptions.target,
     chargeMinimum: chargeSummary?.minimum, chargeMinimumHoleId: chargeSummary?.minimumHoleId,
     chargeMaximum: chargeSummary?.maximum, chargeMaximumHoleId: chargeSummary?.maximumHoleId,
+    chargeAtMinimumCount: builtRows.chargeAtMinimumCount,
     signatureHoleId: builtRows.signatureHoleId
   };
 }
@@ -915,6 +931,7 @@ async function runGeneration(force = false) {
       metricsData.push(['Alvo aplicado', `${formatKg(generated.chargeTarget)} kg`]);
       metricsData.push(['Mínimo aplicado', `${formatKg(generated.chargeMinimum)} kg`]);
       metricsData.push(['ID do menor', generated.chargeMinimumHoleId]);
+      metricsData.push(['Furos na carga mínima', String(generated.chargeAtMinimumCount)]);
       metricsData.push(['Máximo preservado', `${formatKg(generated.chargeMaximum)} kg`]);
       metricsData.push(['ID do maior', generated.chargeMaximumHoleId]);
     }

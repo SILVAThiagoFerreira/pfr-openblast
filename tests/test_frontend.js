@@ -149,6 +149,11 @@ for (const root of [publicRoot, docsRoot]) {
   assert.match(app, /signatureHoleId: builtRows\.signatureHoleId/);
   assert.match(fs.readFileSync(path.join(root, 'elevation.js'), 'utf8'), /hole\.preserved/);
   assert.match(fs.readFileSync(path.join(root, 'charge.js'), 'utf8'), /fixedIndexes/);
+  assert.match(app, /stepKg: BUSINESS\.chargeMinimumStepKg/);
+  assert.match(app, /zeroChargeStepKg: BUSINESS\.zeroChargeStepKg/);
+  assert.match(app, /const baseCharges = chargeOptions\.enabled/);
+  assert.match(app, /notes: chargeNotes/);
+  assert.match(app, /Furos na carga mínima/);
   assert.match(fs.readFileSync(path.join(root, 'force-execution.css'), 'utf8'), /\.signature-hole__toggle/);
 }
 
