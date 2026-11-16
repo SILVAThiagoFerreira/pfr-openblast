@@ -42,16 +42,20 @@ business:
   allow_unmatched_plan_fire_fallback: true
   redistribute_zero_charges: true
   charge_total_target_kg: 17136.048
+  # Carga mínima dos furos zerados na redistribuição padrão (site e CLI, sem bloco de carga-alvo). Os zerados são
+  # espalhados pela regra da janela, abaixo da menor carga positiva. Espelhado em public/config.js (zeroChargeMinimum).
   charge_zero_fill_min_kg: 0.01
-  # Passo entre os furos zerados na redistribuição padrão (site, sem bloco de carga-alvo): a escada começa em
-  # charge_zero_fill_min_kg e sobe neste passo, em kg. Se não couber abaixo da menor carga positiva, o passo é
-  # reduzido e o resultado avisa. Espelhado em public/config.js (zeroChargeStepKg); tests/test_browser_config.py.
-  charge_zero_fill_step_kg: 0.001
   # Carga mínima por furo (site, bloco de carga-alvo): teto do passo, em kg, entre as cargas dos furos de carga
   # baixa (zerados ou abaixo do mínimo). O sistema escolhe o passo dentro desse teto para que esses furos fiquem
   # abaixo da próxima carga real do plano e nenhuma carga se repita. Espelhado em public/config.js
   # (chargeMinimumStepKg); tests/test_browser_config.py verifica a igualdade.
   charge_minimum_step_kg: 5.0
+  # Regra da janela de furos vizinhos (SPEC.md, "Janela de furos vizinhos"): nenhum furo tem carga a menos de
+  # charge_window_min_gap_kg de um furo a até charge_window_size posições antes ou depois dele (na ordem do número).
+  # Cargas iguais ou muito próximas só são permitidas fora dessa janela. Se a diferença não couber, ela desce em passos
+  # de 0,01 kg e o resultado avisa. Espelhado em public/config.js (chargeWindowSize, chargeWindowMinGapKg).
+  charge_window_size: 3
+  charge_window_min_gap_kg: 0.6
   output_name_template: "Plano_Fogo_Realizado_PP{plan_id}.xlsx"
   data_sheet_name: "Dados dos Furos"
   summary_sheet_name: "Resumo"

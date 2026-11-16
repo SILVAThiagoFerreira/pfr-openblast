@@ -22,9 +22,11 @@ SCALAR_KEYS = {
     "signature_hole_id": "signatureHoleId",
     # Carga mínima por furo: passo entre as cargas de carga baixa (nenhuma carga se repete).
     "charge_minimum_step_kg": "chargeMinimumStepKg",
-    # Carga zerada na redistribuição padrão (site): mínimo da escada e passo entre os zerados.
+    # Carga zerada na redistribuição padrão (site): carga mínima dos zerados.
     "charge_zero_fill_min_kg": "zeroChargeMinimum",
-    "charge_zero_fill_step_kg": "zeroChargeStepKg",
+    # Regra da janela de furos vizinhos (tamanho da janela e diferença mínima entre cargas dentro dela).
+    "charge_window_size": "chargeWindowSize",
+    "charge_window_min_gap_kg": "chargeWindowMinGapKg",
 }
 LIST_KEYS = {
     "plan_label_generic_names": "planLabelGenericNames",

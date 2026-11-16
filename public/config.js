@@ -12,13 +12,16 @@ window.PFR_BROWSER_CONFIG = {
     redistributeZeroCharges: true,
     chargeTarget: 17136.048,
     zeroChargeMinimum: 0.01,
-    // Passo entre os furos zerados na redistribuição padrão (sem bloco de carga-alvo): a escada começa em
-    // zeroChargeMinimum e sobe neste passo (reduzido, com aviso, se não couber abaixo da menor carga positiva).
-    // Espelho de business.charge_zero_fill_step_kg (tests/test_browser_config.py verifica a igualdade).
-    zeroChargeStepKg: 0.001,
+    // Carga mínima dos furos zerados na redistribuição padrão (sem bloco de carga-alvo): os zerados são espalhados pela
+    // regra da janela (abaixo), abaixo da menor carga positiva. Espelho de business.charge_zero_fill_min_kg.
     // Carga mínima por furo (bloco de carga-alvo): teto do passo entre as cargas de carga baixa; o passo real é
     // escolhido pelo sistema dentro desse teto (espelho de business.charge_minimum_step_kg; test_browser_config).
     chargeMinimumStepKg: 5,
+    // Regra da janela de furos vizinhos: nenhum furo tem carga a menos de chargeWindowMinGapKg de um furo a até
+    // chargeWindowSize posições antes ou depois dele (na ordem do número). Se não couber, a diferença desce em passos
+    // de 0,01 kg e o resultado avisa. Espelho de business.charge_window_size e charge_window_min_gap_kg.
+    chargeWindowSize: 3,
+    chargeWindowMinGapKg: 0.6,
     // Importação do BREX (BMO): o relógio do BMO grava em UTC; -3 converte para Brasília.
     brexOffsetHours: -3,
     brexOffsetMinHours: -12,

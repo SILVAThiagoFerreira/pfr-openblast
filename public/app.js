@@ -632,14 +632,15 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
   }
   const rawCharges = merged.map(row => parseNumber(row.InputedCharge));
   const chargeNotes = [];
-  // Sem bloco de carga-alvo: redistribuição padrão (zerados em escada e cargas repetidas separadas). Com o bloco, a
+  // Sem bloco de carga-alvo: redistribuição padrão (zerados espalhados e regra da janela de furos vizinhos). Com o bloco, a
   // distribuição parte da entrada original: os zerados já são furos de carga baixa e sobem para a escada acima do mínimo.
   const baseCharges = chargeOptions.enabled
     ? rawCharges
     : window.OpenBlastCharge.redistributeZeroCharges(rawCharges, {
       enabled: BUSINESS.redistributeZeroCharges,
       zeroChargeMinimum: BUSINESS.zeroChargeMinimum,
-      zeroChargeStepKg: BUSINESS.zeroChargeStepKg,
+      windowSize: BUSINESS.chargeWindowSize,
+      windowMinGapKg: BUSINESS.chargeWindowMinGapKg,
       fixedIndexes,
       notes: chargeNotes
     });
@@ -672,6 +673,9 @@ function buildRows(projectRows, finalRows, event, chargeOptions = {}, designRows
       fixedIndexes,
       // Passo entre as cargas de carga baixa (espelho de business.charge_minimum_step_kg). Avisos da distribuição.
       stepKg: BUSINESS.chargeMinimumStepKg,
+      // Regra da janela de furos vizinhos (espelho de business.charge_window_size e charge_window_min_gap_kg).
+      windowSize: BUSINESS.chargeWindowSize,
+      windowMinGapKg: BUSINESS.chargeWindowMinGapKg,
       notes: chargeNotes
     };
     chargeMetadata = { minimumHoleId: numbers[minimumIndex], maximumHoleId: numbers[maximumIndex], maximumValue };

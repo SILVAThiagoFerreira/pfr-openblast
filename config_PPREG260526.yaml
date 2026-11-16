@@ -32,6 +32,8 @@ business:
   redistribute_zero_charges: true
   charge_total_target_kg: 17136.048
   charge_zero_fill_min_kg: 0.01
+  charge_window_size: 3
+  charge_window_min_gap_kg: 0.6
   output_name_template: "Plano_Fogo_Realizado_PP{plan_id}.xlsx"
   data_sheet_name: "Dados dos Furos"
   summary_sheet_name: "Resumo"

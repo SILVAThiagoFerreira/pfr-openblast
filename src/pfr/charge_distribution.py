@@ -1,23 +1,24 @@
 """Distribuição de cargas realizadas (CLI), com a mesma regra do site (public/charge.js).
 
-Porta fiel do algoritmo JavaScript: as duas implementações devem devolver exatamente os mesmos valores
-(verificado por tests/test_charge_parity.py contra o Node). Nenhum valor é arredondado silenciosamente:
-entradas inválidas geram ChargeDistributionError com a causa.
+Porta fiel do algoritmo JavaScript: as duas implementações devem devolver exatamente os mesmos valores e avisos
+(verificado por tests/test_charge_parity.py contra o Node). Regra da janela (SPEC.md, "Janela de furos vizinhos"):
+nenhum furo fica a menos de `window_min_gap_kg` de um furo a até `window_size` posições dele, na ordem do número.
+Pares de dois furos fixos (menor carga, maior carga preservada ou assinatura) mantêm a carga da entrada e são avisados.
+Nenhum valor é arredondado silenciosamente: entradas inválidas geram ChargeDistributionError com a causa.
 """
 
 from __future__ import annotations
 
 import math
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 SCALE = 10**6  # resolução interna de 1e-6 kg
-TOP_GAP_UNITS = 10000  # 0,01 kg entre as cargas mais altas e o máximo preservado
-TIE_STEP_UNITS = 1000  # 0,001 kg entre cargas de origem iguais
+CENT_UNITS = 10000  # passo da redução automática da diferença mínima (0,01 kg)
 BISECTION_STEPS = 200
 
 
 class ChargeDistributionError(ValueError):
-    """Entrada ou alvo que não pode ser distribuído com a regra de cargas distintas."""
+    """Entrada ou alvo que não pode ser distribuído com a regra da janela de furos vizinhos."""
 
 
 def js_round(value: float) -> int:
@@ -34,53 +35,179 @@ def format_kg(units: float) -> str:
     return text.replace(".", ",")
 
 
-def _triangular(count: int) -> int:
-    return (count * (count + 1)) // 2
+def _validate_window(window_size: int, window_min_gap_kg: float) -> None:
+    if isinstance(window_size, bool) or not isinstance(window_size, int) or window_size < 1:
+        raise ChargeDistributionError("A janela de furos vizinhos (charge_window_size em config.yaml) deve ser um inteiro maior que zero.")
+    if not (math.isfinite(window_min_gap_kg) and window_min_gap_kg > 0 and has_at_most_six_decimals(window_min_gap_kg)):
+        raise ChargeDistributionError(
+            "A diferença mínima entre furos vizinhos (charge_window_min_gap_kg em config.yaml) deve ser maior que zero, "
+            "com até seis casas decimais."
+        )
 
 
-def _strictly_increasing(items: list[dict]) -> list[dict]:
-    ordered = sorted(items, key=lambda item: (item["base"], item["index"]))
-    for position in range(1, len(ordered)):
-        if ordered[position]["base"] <= ordered[position - 1]["base"]:
-            ordered[position]["base"] = ordered[position - 1]["base"] + TIE_STEP_UNITS
-    return ordered
-
-
-def _break_load_ties(units_by_index: dict, bounds: dict, pinned_units: Iterable[int]) -> bool:
-    pinned = list(pinned_units)
-    for _ in range(10 * len(units_by_index) + 100):
-        holders: dict[int, list[int]] = {}
-        for index, units in units_by_index.items():
-            holders.setdefault(units, []).append(index)
-        for units in pinned:
-            holders.setdefault(units, []).append(-1)
-        repeated = next(((units, owners) for units, owners in holders.items() if len(owners) > 1), None)
-        if repeated is None:
-            return True
-        units, owners = repeated
-        free_owners = [owner for owner in owners if owner >= 0]
-        if not free_owners:
-            return False
-        mover = free_owners[-1]
-        others = [index for index in units_by_index if index != mover]
-        if units + 1 <= bounds[mover]["hi"] and (units + 1) not in holders:
-            donor = next((index for index in others
-                          if units_by_index[index] - 1 >= bounds[index]["lo"]
-                          and (units_by_index[index] - 1) not in holders), None)
-            if donor is not None:
-                units_by_index[mover] = units + 1
-                units_by_index[donor] -= 1
+def _find_window_violation(
+    units: Sequence[int], window_size: int, gap_of: Callable[[int, int], int], pinned: Sequence[bool]
+) -> tuple[int, int] | None:
+    """Primeira violação da janela. Pares de furos fixos não entram: eles mantêm a carga da entrada (aviso em notes)."""
+    count = len(units)
+    for i in range(count):
+        for j in range(i + 1, min(count - 1, i + window_size) + 1):
+            if pinned[i] and pinned[j]:
                 continue
-        if units - 1 >= bounds[mover]["lo"] and (units - 1) not in holders:
-            donor = next((index for index in others
-                          if units_by_index[index] + 1 <= bounds[index]["hi"]
-                          and (units_by_index[index] + 1) not in holders), None)
-            if donor is not None:
-                units_by_index[mover] = units - 1
-                units_by_index[donor] += 1
-                continue
+            if abs(units[i] - units[j]) < gap_of(i, j):
+                return (i, j)
+    return None
+
+
+def _count_pinned_conflicts(units: Sequence[int], pinned: Sequence[bool], window_size: int, gap: int) -> int:
+    """Quantos pares de furos fixos a até window_size posições estão a menos de gap um do outro."""
+    count = len(units)
+    total = 0
+    for i in range(count):
+        for j in range(i + 1, min(count - 1, i + window_size) + 1):
+            if pinned[i] and pinned[j] and abs(units[i] - units[j]) < gap:
+                total += 1
+    return total
+
+
+def _pinned_conflict_note(total: int, window_size: int, gap_units_max: int) -> str:
+    pairs = "1 par de furos fixos" if total == 1 else f"{total} pares de furos fixos"
+    return (
+        f"{pairs} (menor carga, maior carga preservada ou assinatura) ficam a até {window_size} posições com diferença "
+        f"menor que {format_kg(gap_units_max)} kg; eles não podem ser ajustados e foram mantidos como vieram da entrada."
+    )
+
+
+def _scale_to_total(base: Sequence[int], min_units: int, max_units: int, total_units: int) -> list[int] | None:
+    """Escala o excesso de cada valor acima de min_units até somar total_units (cada valor entre min e max − 1)."""
+    count = len(base)
+    upper = max_units - 1
+    if not count:
+        return [] if total_units == 0 else None
+    if count * min_units > total_units or count * upper < total_units:
+        return None
+    excess = [max(0, value - min_units) for value in base]
+    positive = [value for value in excess if value > 0]
+    if not positive:
+        return [min_units] * count if count * min_units == total_units else None
+
+    def values_at(scale: float) -> list[float]:
+        return [min(upper, max(min_units, min_units + scale * value)) for value in excess]
+
+    def sum_at(scale: float) -> float:
+        # Soma sequencial, como o reduce do JavaScript (sum() do Python pode usar soma compensada e divergir).
+        total = 0
+        for value in values_at(scale):
+            total = total + value
+        return total
+
+    scale_low = 0.0
+    scale_high = (upper - min_units) / min(positive)
+    if sum_at(scale_high) < total_units:
+        return None
+    for _ in range(BISECTION_STEPS):
+        middle = (scale_low + scale_high) / 2
+        if sum_at(middle) < total_units:
+            scale_low = middle
+        else:
+            scale_high = middle
+    real = values_at(scale_high)
+    units = [math.floor(value) for value in real]
+    leftover = total_units - sum(units)
+    candidates = sorted(
+        (position for position in range(count) if units[position] < upper),
+        key=lambda position: (-(real[position] - units[position]), position),
+    )
+    if leftover < 0 or leftover > len(candidates):
+        raise ChargeDistributionError("Falha interna ao arredondar a distribuição de cargas.")
+    for step in range(leftover):
+        units[candidates[step]] += 1
+    return units
+
+
+def _repair_window(
+    units: list[int],
+    lo: Sequence[int],
+    hi: Sequence[int],
+    pinned: Sequence[bool],
+    window_size: int,
+    gap_of: Callable[[int, int], int],
+) -> bool:
+    """Ajusta `units` (in place) até não haver violação, com ajuste mínimo e compensação em outro furo livre."""
+    count = len(units)
+
+    def neighbors_of(index: int) -> list[int]:
+        return [p for p in range(max(0, index - window_size), min(count - 1, index + window_size) + 1) if p != index]
+
+    def is_clear(index: int) -> bool:
+        return all(abs(units[index] - units[p]) >= gap_of(index, p) for p in neighbors_of(index))
+
+    def move_off(mover: int) -> bool:
+        current = units[mover]
+        neighbors = neighbors_of(mover)
+        points = {lo[mover], hi[mover]}
+        for p in neighbors:
+            points.add(units[p] + gap_of(mover, p))
+            points.add(units[p] - gap_of(mover, p))
+        candidates = sorted(
+            (
+                x
+                for x in points
+                if lo[mover] <= x <= hi[mover]
+                and x != current
+                and all(abs(x - units[p]) >= gap_of(mover, p) for p in neighbors)
+            ),
+            key=lambda x: (abs(x - current), x),
+        )
+        for x in candidates:
+            delta = x - current
+            for k in range(1, count):
+                for donor in (mover - k, mover + k):
+                    if donor < 0 or donor >= count or pinned[donor]:
+                        continue
+                    before = units[donor]
+                    target = before - delta
+                    if target < lo[donor] or target > hi[donor]:
+                        continue
+                    units[mover] = x
+                    units[donor] = target
+                    if is_clear(mover) and is_clear(donor):
+                        return True
+                    units[mover] = current
+                    units[donor] = before
         return False
+
+    guard_limit = count * window_size * 4 + 100
+    for _ in range(guard_limit):
+        pair = _find_window_violation(units, window_size, gap_of, pinned)
+        if pair is None:
+            return True
+        movers = [index for index in (pair[1], pair[0]) if not pinned[index]]
+        if not any(move_off(mover) for mover in movers):
+            return False
     return False
+
+
+def _largest_feasible_gap(gap_units_max: int, attempt: Callable[[int], object | None]) -> tuple[object, int] | None:
+    """Maior diferença mínima entre o teto e 0,01 kg com solução. Retorna (resultado, diferença) ou None."""
+    first = attempt(gap_units_max)
+    if first is not None:
+        return first, gap_units_max
+    max_steps = (gap_units_max - 1) // CENT_UNITS
+    chosen = attempt(CENT_UNITS) if max_steps >= 1 else None
+    if chosen is None:
+        return None
+    low = 1
+    high = max_steps + 1
+    while high - low > 1:
+        middle = (low + high) // 2
+        nxt = attempt(middle * CENT_UNITS)
+        if nxt is not None:
+            low = middle
+            chosen = nxt
+        else:
+            high = middle
+    return chosen, low * CENT_UNITS
 
 
 def redistribute_zero_charges(
@@ -88,21 +215,22 @@ def redistribute_zero_charges(
     *,
     enabled: bool,
     zero_minimum: float,
-    zero_step_kg: float,
+    window_size: int,
+    window_min_gap_kg: float,
     fixed_indexes: Iterable[int] = (),
     notes: list[str] | None = None,
 ) -> list[float | None]:
-    """Redistribuição padrão (sem alvo): escada para zerados, demais furos com valores distintos, total exato."""
+    """Redistribuição padrão (sem alvo): escada cíclica para zerados, regra da janela, total exato."""
     values = list(values)
     if not enabled:
         return values.copy()
     if not (math.isfinite(zero_minimum) and zero_minimum > 0 and has_at_most_six_decimals(zero_minimum)):
         raise ChargeDistributionError("A carga mínima dos furos zerados deve ser maior que zero, com até seis casas decimais.")
-    if not (math.isfinite(zero_step_kg) and zero_step_kg > 0 and has_at_most_six_decimals(zero_step_kg)):
-        raise ChargeDistributionError("O passo entre os furos zerados deve ser maior que zero, com até seis casas decimais.")
-    fixed = set(fixed_indexes)
-    if any(index < 0 or index >= len(values) for index in fixed):
+    _validate_window(window_size, window_min_gap_kg)
+    fixed_list = list(fixed_indexes)
+    if any(index < 0 or index >= len(values) for index in fixed_list):
         raise ChargeDistributionError("O furo de assinatura não existe na lista de cargas.")
+    fixed = set(fixed_list)
 
     units: list[int | None] = []
     for index, value in enumerate(values):
@@ -133,151 +261,120 @@ def redistribute_zero_charges(
     zero_indexes = [index for index in valid if units[index] == 0 and index not in fixed]
     free_indexes = [index for index in positive if index not in pinned]
     minimum_units = js_round(zero_minimum * SCALE)
-    requested_step_units = js_round(zero_step_kg * SCALE)
+    gap_units_max = js_round(window_min_gap_kg * SCALE)
     if zero_indexes and minimum_units >= min_units:
         raise ChargeDistributionError(
             f"A carga mínima dos furos zerados ({format_kg(minimum_units)} kg) deve ser menor que a menor carga "
             f"positiva do plano ({format_kg(min_units)} kg)."
         )
-    step_units = requested_step_units
-    step_reduced = False
-    if len(zero_indexes) > 1:
-        step_units = min(requested_step_units, (min_units - minimum_units - 1) // (len(zero_indexes) - 1))
-        if step_units < 1:
-            raise ChargeDistributionError(
-                f"Os {len(zero_indexes)} furos zerados não cabem em escada entre {format_kg(minimum_units)} kg "
-                f"e a menor carga positiva ({format_kg(min_units)} kg)."
-            )
-        step_reduced = step_units < requested_step_units
-    zero_units = {index: minimum_units + step_units * position for position, index in enumerate(zero_indexes)}
-    stair_total = sum(zero_units.values())
+    if zero_indexes and not free_indexes:
+        raise ChargeDistributionError("Não há furos intermediários para receber a carga dos furos zerados.")
+    # Entre dois zerados, a escada cíclica usa W+1 níveis abaixo da menor carga positiva (zero, +g, … +W·g).
+    zero_room_units = (min_units - 1 - minimum_units) // window_size if len(zero_indexes) > 1 else math.inf
+    if len(zero_indexes) > 1 and zero_room_units < 1:
+        raise ChargeDistributionError(
+            f"Os {len(zero_indexes)} furos zerados não cabem com {window_size} furos vizinhos distintos entre "
+            f"{format_kg(minimum_units)} kg e a menor carga positiva ({format_kg(min_units)} kg)."
+        )
     total_units = sum(units[index] for index in valid)
     pinned_total = sum((units[index] or 0) for index in pinned)
-    free_target = total_units - pinned_total - stair_total
-    free_floor = len(free_indexes) * min_units
-    if not free_indexes and stair_total > 0:
-        raise ChargeDistributionError("Não há furos intermediários para receber a carga dos furos zerados.")
-    if free_target < free_floor:
-        raise ChargeDistributionError("Não há carga suficiente acima da menor carga positiva para receber a escada dos furos zerados.")
-    value_counts: dict[int, int] = {}
-    for index in positive:
-        value_counts[units[index]] = value_counts.get(units[index], 0) + 1
-    tied_free_count = sum(1 for index in free_indexes if value_counts[units[index]] > 1)
 
-    ordered = _strictly_increasing([{"index": index, "base": units[index]} for index in free_indexes])
-    excess_sum = sum(item["base"] - min_units for item in ordered)
-    extra = free_target - free_floor
-    if extra < 0 or extra > excess_sum:
-        raise ChargeDistributionError("Falha interna ao redistribuir as cargas zeradas.")
-    scaled: dict[int, int] = {}
-    if excess_sum == 0:
-        for item in ordered:
-            scaled[item["index"]] = min_units
-    elif ordered:
-        factor = extra / excess_sum
-        exact = [(item["base"] - min_units) * factor for item in ordered]
-        floors = [math.floor(value) for value in exact]
-        leftover = extra - sum(floors)
-        if leftover < 0 or leftover > len(ordered):
-            raise ChargeDistributionError("Falha interna ao arredondar a redistribuição das cargas zeradas.")
-        by_fraction = sorted(range(len(ordered)), key=lambda p: (-(exact[p] - floors[p]), p))
-        for position in by_fraction[:leftover]:
-            floors[position] += 1
-        for position, item in enumerate(ordered):
-            scaled[item["index"]] = min_units + floors[position]
-    bounds = {item["index"]: {"lo": min_units, "hi": max_units - 1} for item in ordered}
-    movable = {item["index"]: scaled[item["index"]] for item in ordered}
-    if any(value < min_units or value > max_units - 1 for value in movable.values()):
-        raise ChargeDistributionError("Não há como redistribuir a carga dos zerados mantendo todas as cargas entre a menor e a maior carga.")
-    pinned_values = {min_units, max_units, *zero_units.values(),
-                     *(units[index] for index in fixed if units[index] is not None)}
-    if not _break_load_ties(movable, bounds, pinned_values):
-        raise ChargeDistributionError(
-            "Não foi possível manter todas as cargas distintas na redistribuição padrão: faltam furos livres "
-            "para separar as repetições sem alterar a menor ou a maior carga."
+    def build_base(gap: int) -> tuple[dict[int, int], int] | None:
+        zero_gap = min(gap, zero_room_units)
+        zero_levels = [minimum_units + (position % (window_size + 1)) * zero_gap for position in range(len(zero_indexes))]
+        zero_total = sum(zero_levels)
+        scaled_free = _scale_to_total(
+            [units[index] for index in free_indexes], min_units, max_units, total_units - pinned_total - zero_total
         )
+        if scaled_free is None:
+            return None
+        base: dict[int, int] = {}
+        for index in valid:
+            if index in pinned:
+                base[index] = units[index]
+        for position, index in enumerate(zero_indexes):
+            base[index] = zero_levels[position]
+        for position, index in enumerate(free_indexes):
+            base[index] = scaled_free[position]
+        return base, zero_gap
 
+    def run_window(gap: int) -> tuple[list[int], list[int], list[bool], int] | None:
+        built = build_base(gap)
+        if built is None:
+            return None
+        base, zero_gap = built
+        seq_base = [base[index] for index in valid]
+        pinned_flags = [index in pinned for index in valid]
+        zero_like = [value < min_units for value in seq_base]
+        lo = [
+            value if pinned_flags[position] else (minimum_units if zero_like[position] else min_units)
+            for position, value in enumerate(seq_base)
+        ]
+        hi = [
+            value if pinned_flags[position] else (min_units - 1 if zero_like[position] else max_units - 1)
+            for position, value in enumerate(seq_base)
+        ]
+
+        def gap_of(a: int, b: int) -> int:
+            return zero_gap if zero_like[a] and zero_like[b] else gap
+
+        seq = list(seq_base)
+        if not _repair_window(seq, lo, hi, pinned_flags, window_size, gap_of):
+            return None
+        if _find_window_violation(seq, window_size, gap_of, pinned_flags) is not None:
+            raise ChargeDistributionError("Falha interna: a janela de furos vizinhos ficou violada após a redistribuição.")
+        return seq, seq_base, pinned_flags, zero_gap
+
+    found = _largest_feasible_gap(gap_units_max, run_window)
+    if found is None:
+        probe = build_base(CENT_UNITS)
+        if probe is None:
+            zero_total = sum(
+                minimum_units + (position % (window_size + 1)) * min(CENT_UNITS, zero_room_units)
+                for position in range(len(zero_indexes))
+            )
+            if total_units - pinned_total - zero_total < len(free_indexes) * min_units:
+                raise ChargeDistributionError("Não há carga suficiente acima da menor carga positiva para receber a escada dos furos zerados.")
+            raise ChargeDistributionError("Não há espaço abaixo da maior carga para receber a carga dos furos zerados sem repetir a maior carga.")
+        raise ChargeDistributionError(
+            f"Não há como manter cargas distintas entre furos vizinhos (até {window_size} posições) com estes furos e "
+            "este total, sem alterar a menor ou a maior carga."
+        )
+    (seq, seq_base, pinned_flags, zero_gap_units), gap_units = found
+    changed = sum(1 for position, value in enumerate(seq) if value != seq_base[position])
+    pinned_conflicts = _count_pinned_conflicts(seq_base, pinned_flags, window_size, gap_units_max)
+
+    output_by_index = {index: seq[position] for position, index in enumerate(valid)}
     result: list[float | None] = []
     for index, value in enumerate(values):
-        if index in pinned:
+        if index not in output_by_index or index in pinned:
             result.append(value)
-        elif index in zero_units:
-            result.append(zero_units[index] / SCALE)
-        elif index in movable:
-            result.append(movable[index] / SCALE)
         else:
-            result.append(value)
+            result.append(output_by_index[index] / SCALE)
     output_units = [None if value is None else js_round(value * SCALE) for value in result]
     if sum((unit or 0) for unit in output_units) != total_units:
         raise ChargeDistributionError("A redistribuição não fechou exatamente no total de entrada.")
-    output_counts: dict[int, int] = {}
-    for unit in output_units:
-        if unit is not None:
-            output_counts[unit] = output_counts.get(unit, 0) + 1
-    if any(count > 1 and unit != max_units for unit, count in output_counts.items()):
-        raise ChargeDistributionError(
-            "Não foi possível manter todas as cargas distintas na redistribuição padrão: faltam furos livres "
-            "para separar as repetições sem alterar a menor ou a maior carga."
-        )
     if notes is not None:
-        if step_reduced:
+        if zero_gap_units < gap_units:
             notes.append(
-                f"Os {len(zero_indexes)} furos zerados ficam abaixo da menor carga positiva do plano "
-                f"({format_kg(min_units)} kg); o passo entre eles foi reduzido de {format_kg(requested_step_units)} kg "
-                f"para {format_kg(step_units)} kg."
+                f"Os {len(zero_indexes)} furos zerados ficam em uma faixa curta (abaixo de {format_kg(min_units)} kg): "
+                f"a diferença mínima entre eles foi reduzida para {format_kg(zero_gap_units)} kg."
             )
-        if tied_free_count > 0:
+        if gap_units < gap_units_max:
             notes.append(
-                f"{tied_free_count} furos com carga repetida na entrada foram separados "
-                f"(passo de {format_kg(TIE_STEP_UNITS)} kg entre cargas iguais); o total continua igual."
+                f"A diferença mínima entre furos vizinhos ficou em {format_kg(gap_units)} kg (e não "
+                f"{format_kg(gap_units_max)} kg): com uma diferença maior, estes furos fixos e zerados não cabem na "
+                f"janela de {window_size} posições."
+            )
+        if pinned_conflicts > 0:
+            notes.append(_pinned_conflict_note(pinned_conflicts, window_size, gap_units_max))
+        if changed > 0:
+            changed_text = "1 furo teve" if changed == 1 else f"{changed} furos tiveram"
+            notes.append(
+                f"{changed_text} a carga ajustada para manter {format_kg(gap_units)} kg de diferença entre furos vizinhos "
+                f"(até {window_size} posições antes ou depois); o total continua igual."
             )
     return result
-
-
-def _scale_group(entries: list[dict], minimum_units: int, maximum_units: int, total_units: int) -> dict | None:
-    """Distribui total_units entre entries (bases estritamente crescentes) com pisos e tetos distintos."""
-    count = len(entries)
-    if not count:
-        return {"units": [], "lo": [], "hi": []}
-    top_gap = min(TOP_GAP_UNITS, math.floor((count * maximum_units - total_units) / _triangular(count)))
-    if top_gap < 1:
-        return None
-    lo = [minimum_units + (position + 1) for position in range(count)]
-    hi = [maximum_units - top_gap * (count - position) for position in range(count)]
-    if any(lo[position] >= hi[position] for position in range(count)):
-        return None
-    excess = [entry["base"] - minimum_units for entry in entries]
-
-    def values_at(scale: float) -> list[float]:
-        return [min(hi[p], max(lo[p], minimum_units + scale * excess[p])) for p in range(count)]
-
-    def sum_at(scale: float) -> float:
-        return sum(values_at(scale))
-
-    if sum_at(0) > total_units:
-        return None
-    scale_low = 0.0
-    scale_high = max((hi[p] - minimum_units) / excess[p] for p in range(count))
-    if sum_at(scale_high) < total_units:
-        return None
-    for _ in range(BISECTION_STEPS):
-        middle = (scale_low + scale_high) / 2
-        if sum_at(middle) < total_units:
-            scale_low = middle
-        else:
-            scale_high = middle
-    real = values_at(scale_high)
-    units = [math.floor(value) for value in real]
-    leftover = total_units - sum(units)
-    candidates = sorted(
-        (p for p in range(count) if units[p] < hi[p]),
-        key=lambda p: (-(real[p] - units[p]), p),
-    )
-    if leftover < 0 or leftover > len(candidates):
-        raise ChargeDistributionError("Falha interna ao arredondar a distribuição de cargas.")
-    for step in range(leftover):
-        units[candidates[step]] += 1
-    return {"units": units, "lo": lo, "hi": hi}
 
 
 def distribute_charges(
@@ -285,6 +382,8 @@ def distribute_charges(
     target: float,
     *,
     step_kg: float,
+    window_size: int,
+    window_min_gap_kg: float,
     minimum_index: int | None = None,
     minimum_value: float | None = None,
     maximum_index: int | None = None,
@@ -293,16 +392,15 @@ def distribute_charges(
     fixed_indexes: Iterable[int] = (),
     notes: list[str] | None = None,
 ) -> list[float]:
-    """Fecha o total em `target` com cargas distintas, mantendo mínimo, máximo preservado e furos fixos."""
-    charges_in = list(values)
-    if len(charges_in) < 3:
+    """Fecha o total em `target`, mantendo mínimo, máximo preservado e furos fixos, com a regra da janela."""
+    charges = list(values)
+    if len(charges) < 3:
         raise ChargeDistributionError("São necessários pelo menos três furos para distribuir uma carga-alvo preservando os extremos.")
     if not (math.isfinite(target) and target > 0):
         raise ChargeDistributionError("O total de carga realizada deve ser um número maior que zero.")
-    for index, value in enumerate(charges_in):
+    for index, value in enumerate(charges):
         if not math.isfinite(value) or value < 0:
             raise ChargeDistributionError(f"A carga realizada do furo {index + 1} não é válida para a distribuição.")
-    charges = charges_in
     default_minimum = min(charges)
     default_maximum = max(charges)
     if minimum_index is None:
@@ -313,8 +411,7 @@ def distribute_charges(
     if not (0 <= minimum_index < count and 0 <= maximum_index < count and minimum_index != maximum_index):
         raise ChargeDistributionError("Não foi possível identificar furos extremos distintos para distribuir a carga.")
     max_indexes = sorted(set(maximum_indexes)) if maximum_indexes is not None else [maximum_index]
-    if (not max_indexes or any(not (0 <= i < count) for i in max_indexes)
-            or maximum_index not in max_indexes or minimum_index in max_indexes):
+    if not max_indexes or any(not (0 <= i < count) for i in max_indexes) or maximum_index not in max_indexes or minimum_index in max_indexes:
         raise ChargeDistributionError("Não foi possível identificar furos extremos distintos para distribuir a carga.")
     fixed_list = sorted(set(fixed_indexes))
     if any(not (0 <= i < count) or i == minimum_index for i in fixed_list):
@@ -331,6 +428,7 @@ def distribute_charges(
         raise ChargeDistributionError("A carga mínima informada não pode ser maior que a maior carga preservada da planilha.")
     if not (math.isfinite(step_kg) and step_kg > 0):
         raise ChargeDistributionError("O passo de carga entre furos (charge_minimum_step_kg em config.yaml) deve ser um número maior que zero.")
+    _validate_window(window_size, window_min_gap_kg)
 
     adjustable = [i for i in range(count) if i != minimum_index and i not in max_indexes and i not in fixed]
     if not adjustable:
@@ -348,7 +446,7 @@ def distribute_charges(
     free_count = len(adjustable)
     free_target_units = target_units - minimum_units - preserved_maximum_count * maximum_units - fixed_sum
     plain_lower = free_count * minimum_units
-    plain_upper = free_count * maximum_units
+    plain_upper = free_count * (maximum_units - 1)
     if free_target_units < plain_lower or free_target_units > plain_upper:
         lower = (minimum_units + preserved_maximum_count * maximum_units + fixed_sum + plain_lower) / SCALE
         upper = (minimum_units + preserved_maximum_count * maximum_units + fixed_sum + plain_upper) / SCALE
@@ -358,8 +456,6 @@ def distribute_charges(
         )
     if maximum_units == minimum_units:
         raise ChargeDistributionError("A carga mínima não pode ser igual à maior carga preservada: os demais furos teriam que repetir esse valor.")
-    if free_target_units < plain_lower + _triangular(free_count) or free_target_units > plain_upper - _triangular(free_count):
-        raise ChargeDistributionError("O alvo está tão perto do menor ou do maior valor possível que não há como manter todas as cargas distintas. Ajuste o total.")
 
     low_indexes = sorted((i for i in adjustable if charges[i] <= minimum), key=lambda i: (charges[i], i))
     above_indexes = [i for i in adjustable if charges[i] > minimum]
@@ -390,41 +486,68 @@ def distribute_charges(
             return staircase[index]
         return max(minimum_units + 1, js_round(charges[index] * SCALE))
 
-    plan = None
+    final_units: dict[int, int] = {}
+    staircase_kept = False
     if above_indexes:
-        ordered = _strictly_increasing([{"index": i, "base": base_units(i)} for i in above_indexes])
-        solved = _scale_group(ordered, minimum_units, maximum_units, free_target_units - staircase_total)
+        solved = _scale_to_total([base_units(i) for i in above_indexes], minimum_units, maximum_units, free_target_units - staircase_total)
         if solved is not None:
-            plan = {"ordered": ordered, "solved": solved, "staircase_kept": True}
+            for position, index in enumerate(above_indexes):
+                final_units[index] = solved[position]
+            staircase_kept = True
     elif free_target_units == staircase_total:
-        plan = {"ordered": [], "solved": {"units": [], "lo": [], "hi": []}, "staircase_kept": True}
-    if plan is None:
+        staircase_kept = True
+    if staircase_kept:
+        final_units.update(staircase)
+    else:
         if low_indexes and notes is not None:
             notes.append("O total não coube só com os demais furos: os furos de carga baixa também subiram na mesma proporção.")
-        ordered = _strictly_increasing([{"index": i, "base": base_units(i)} for i in adjustable])
-        solved = _scale_group(ordered, minimum_units, maximum_units, free_target_units)
+        solved = _scale_to_total([base_units(i) for i in adjustable], minimum_units, maximum_units, free_target_units)
         if solved is None:
-            raise ChargeDistributionError("Não há como distribuir o total com cargas distintas entre os furos. Ajuste o total.")
-        plan = {"ordered": ordered, "solved": solved, "staircase_kept": False}
+            raise ChargeDistributionError("Não há como distribuir o total entre os furos mantendo a menor e a maior carga. Ajuste o total.")
+        for position, index in enumerate(adjustable):
+            final_units[index] = solved[position]
 
-    final_units: dict[int, int] = {}
-    bounds: dict[int, dict] = {}
-    for position, item in enumerate(plan["ordered"]):
-        final_units[item["index"]] = plan["solved"]["units"][position]
-        bounds[item["index"]] = {"lo": plan["solved"]["lo"][position], "hi": plan["solved"]["hi"][position]}
-    staircase_kept = plan["staircase_kept"]
-    if staircase_kept:
-        for index, units in staircase.items():
-            final_units[index] = units
-    pinned_units = list(fixed_units)
-    if staircase_kept:
-        pinned_units.extend(staircase.values())
-    movable = {index: units for index, units in final_units.items() if not (staircase_kept and index in staircase)}
-    movable_bounds = {index: bounds[index] for index in movable if index in bounds}
-    if not _break_load_ties(movable, movable_bounds, pinned_units):
-        raise ChargeDistributionError("Não foi possível manter todas as cargas distintas com este total. Ajuste o total.")
-    for index, units in movable.items():
-        final_units[index] = units
+    # Sequência completa (todos os furos, na ordem do número): fixos e extremos pinados; os demais são livres.
+    seq_base = [0] * count
+    lo = [0] * count
+    hi = [0] * count
+    pinned_flags = [False] * count
+    for index in range(count):
+        if index == minimum_index:
+            seq_base[index] = minimum_units
+            lo[index] = hi[index] = minimum_units
+            pinned_flags[index] = True
+        elif index in fixed:
+            seq_base[index] = js_round(charges[index] * SCALE)
+            lo[index] = hi[index] = seq_base[index]
+            pinned_flags[index] = True
+        elif index in max_indexes:
+            seq_base[index] = maximum_units
+            lo[index] = hi[index] = maximum_units
+            pinned_flags[index] = True
+        else:
+            seq_base[index] = final_units[index]
+            lo[index] = minimum_units
+            hi[index] = maximum_units - 1
+    gap_units_max = js_round(window_min_gap_kg * SCALE)
+
+    def run_window(gap: int) -> list[int] | None:
+        def gap_of(_a: int, _b: int) -> int:
+            return gap
+
+        seq = list(seq_base)
+        if not _repair_window(seq, lo, hi, pinned_flags, window_size, gap_of):
+            return None
+        if _find_window_violation(seq, window_size, gap_of, pinned_flags) is not None:
+            raise ChargeDistributionError("Falha interna: a janela de furos vizinhos ficou violada após a distribuição.")
+        return seq
+
+    found = _largest_feasible_gap(gap_units_max, run_window)
+    if found is None:
+        raise ChargeDistributionError(f"Não há como manter cargas distintas entre furos vizinhos (até {window_size} posições) com este total. Ajuste o total.")
+    seq, gap_units = found[0], found[1]
+    changed = sum(1 for index in range(count) if seq[index] != seq_base[index] and not pinned_flags[index])
+    pinned_conflicts = _count_pinned_conflicts(seq_base, pinned_flags, window_size, gap_units_max)
 
     result: list[float] = []
     for index in range(count):
@@ -435,10 +558,22 @@ def distribute_charges(
         elif index in max_indexes:
             result.append(maximum)
         else:
-            result.append(final_units[index] / SCALE)
+            result.append(seq[index] / SCALE)
     if sum(js_round(value * SCALE) for value in result) != target_units:
         raise ChargeDistributionError("A distribuição não fechou exatamente no total informado. Tente um alvo com até seis casas decimais.")
-    free_values = [js_round(result[i] * SCALE) for i in adjustable]
-    if len(set(free_values)) != len(free_values):
-        raise ChargeDistributionError("Não foi possível manter todas as cargas distintas com este total. Ajuste o total.")
+    if notes is not None:
+        if gap_units < gap_units_max:
+            notes.append(
+                f"A diferença mínima entre furos vizinhos ficou em {format_kg(gap_units)} kg (e não "
+                f"{format_kg(gap_units_max)} kg): com uma diferença maior, estes furos fixos não cabem na janela de "
+                f"{window_size} posições."
+            )
+        if pinned_conflicts > 0:
+            notes.append(_pinned_conflict_note(pinned_conflicts, window_size, gap_units_max))
+        if changed > 0:
+            changed_text = "1 furo teve" if changed == 1 else f"{changed} furos tiveram"
+            notes.append(
+                f"{changed_text} a carga ajustada para manter {format_kg(gap_units)} kg de diferença entre furos vizinhos "
+                f"(até {window_size} posições antes ou depois); o total continua igual."
+            )
     return result

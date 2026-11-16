@@ -56,7 +56,8 @@ throwsCode(() => signature.validateTime([1000, 1000.4, 1200], 1, 2), 'SIGNATURE_
 
 // 4) Carga: o furo fica fora da redistribuição e da carga-alvo; o total conta a carga fixa.
 const holeCharges = [5, 40, 10, 12, 60];
-const baseOptions = { minimumIndex: 0, minimumValue: 5, maximumIndex: 4, maximumValue: 60, maximumIndexes: [4], stepKg: 0.6 };
+const WINDOW = { windowSize: 3, windowMinGapKg: 0.6 };
+const baseOptions = { minimumIndex: 0, minimumValue: 5, maximumIndex: 4, maximumValue: 60, maximumIndexes: [4], stepKg: 0.6, ...WINDOW };
 const withHole = distributeCharges(holeCharges, 150, { ...baseOptions, fixedIndexes: [1] });
 assert.equal(withHole[1], 40, 'carga do furo de assinatura igual à entrada');
 assert.equal(withHole[0], 5, 'furo de menor carga recebe o mínimo');
@@ -69,22 +70,25 @@ assert.deepEqual(
   distributeCharges(holeCharges, 150, { ...baseOptions, fixedIndexes: [] }),
   distributeCharges(holeCharges, 150, baseOptions),
 );
-assert.deepEqual(distributeCharges([5, 10, 15, 60], 100, { stepKg: 0.6 }), distributeCharges([5, 10, 15, 60], 100, { stepKg: 0.6, fixedIndexes: [] }));
+assert.deepEqual(distributeCharges([5, 10, 15, 60], 100, { stepKg: 0.6, ...WINDOW }), distributeCharges([5, 10, 15, 60], 100, { stepKg: 0.6, fixedIndexes: [], ...WINDOW }));
 
 throwsCode(() => distributeCharges(holeCharges, 150, { ...baseOptions, fixedIndexes: [0] }), undefined, /furo de assinatura não pode ser o furo de menor carga/);
 // Sem furo intermediário livre (o único é o de assinatura), o fechamento é recusado com mensagem explícita.
-assert.throws(() => distributeCharges([5, 40, 60], 300, { stepKg: 0.6, minimumIndex: 0, maximumIndex: 2, fixedIndexes: [1] }), /Não há furos intermediários/);
-assert.throws(() => distributeCharges([5, 40, 10, 60], 400, { stepKg: 0.6, minimumIndex: 0, maximumIndex: 3, fixedIndexes: [1] }), /alvo é impossível/);
+assert.throws(() => distributeCharges([5, 40, 60], 300, { stepKg: 0.6, ...WINDOW, minimumIndex: 0, maximumIndex: 2, fixedIndexes: [1] }), /Não há furos intermediários/);
+assert.throws(() => distributeCharges([5, 40, 10, 60], 400, { stepKg: 0.6, ...WINDOW, minimumIndex: 0, maximumIndex: 3, fixedIndexes: [1] }), /alvo é impossível/);
 
 // 5) Carga zerada: o furo de assinatura não recebe a carga mínima e não financia a redistribuição.
-const zeroOptions = { enabled: true, zeroChargeMinimum: 0.5, zeroChargeStepKg: 0.001 };
+const zeroOptions = { enabled: true, zeroChargeMinimum: 0.5, ...WINDOW };
 const zeroRedistributed = redistributeZeroCharges([5, 0, 20, 10, 60], { ...zeroOptions, fixedIndexes: [2] });
 assert.equal(zeroRedistributed[2], 20, 'carga do furo de assinatura igual à entrada');
 assert.equal(zeroRedistributed[1], 0.5, 'o outro furo zerado recebe a carga mínima');
 near(total(zeroRedistributed), 95, 1e-9);
 const zeroOnHole = redistributeZeroCharges([5, 0, 20, 0, 60], { ...zeroOptions, fixedIndexes: [3] });
 assert.equal(zeroOnHole[3], 0, 'furo de assinatura com carga zero continua zero');
-assert.equal(zeroOnHole[1], 0.5);
+// O zerado livre está a até 3 posições do furo de assinatura (zero): a regra da janela exige 0,6 kg de diferença.
+assert.equal(zeroOnHole[1], 0.6, 'o zerado vizinho do furo de assinatura zero sobe à diferença mínima da janela');
+assert.ok(Math.abs(zeroOnHole[1] - zeroOnHole[3]) >= 0.6 - 1e-9);
+near(total(zeroOnHole), 85, 1e-9);
 assert.deepEqual(redistributeZeroCharges([5, 0, 20, 10, 60], { ...zeroOptions, enabled: false }), [5, 0, 20, 10, 60]);
 
 // 6) Tampão: o furo de assinatura não recebe variação, mas segue a casa decimal normal (3,04 vira 3,0).

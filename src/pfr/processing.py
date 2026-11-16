@@ -156,6 +156,14 @@ def _business_number(cfg: dict, key: str) -> float:
     return float(value)
 
 
+def _business_integer(cfg: dict, key: str) -> int:
+    """Lê business.<key> inteiro obrigatório (sem padrão escondido)."""
+    value = _business_number(cfg, key)
+    if not float(value).is_integer():
+        raise ValueError(f"business.{key} deve ser um número inteiro em config.yaml.")
+    return int(value)
+
+
 def _charge_list(charges: pd.Series) -> list[float | None]:
     """Cargas como lista; vazio vira None. Seis casas decimais, como a resolução do site."""
     numbers = pd.to_numeric(charges, errors="coerce").astype(float)
@@ -188,7 +196,8 @@ def _redistribute_zero_charges(
             raw,
             enabled=True,
             zero_minimum=_business_number(cfg, "charge_zero_fill_min_kg"),
-            zero_step_kg=_business_number(cfg, "charge_zero_fill_step_kg"),
+            window_size=_business_integer(cfg, "charge_window_size"),
+            window_min_gap_kg=_business_number(cfg, "charge_window_min_gap_kg"),
             fixed_indexes=fixed,
             notes=notes,
         )
@@ -232,6 +241,8 @@ def _enforce_charge_total_target(
             subset,
             target,
             step_kg=_business_number(cfg, "charge_minimum_step_kg"),
+            window_size=_business_integer(cfg, "charge_window_size"),
+            window_min_gap_kg=_business_number(cfg, "charge_window_min_gap_kg"),
             minimum_index=minimum_index,
             minimum_value=lowest,
             maximum_index=maximum_indexes[0],

@@ -114,6 +114,32 @@ Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), confi
 - Resolvido: o total da redistribuição padrão (antes 46.779,599748 kg para entrada de 46.779,60 kg) agora fecha exato, e os zerados não ficam negativos.
 - Pendência aberta: a redistribuição padrão só vale com `redistribute_zero_charges` ligado; desligada, a saída segue a entrada e as repetições do Config Final reaparecem.
 
+## Atualização: janela de furos vizinhos (regra de 3 furos)
+Motivo: o usuário pediu "não ter furos repetidos nos 3 valores anteriores ou posteriores" ("ainda não está bom"). Achado: a regra anterior (todas as cargas distintas) separava cargas de origem iguais por 0,001 kg. No REG RAMPA F3 isso dava vizinhos como 51,9981 e 51,9991 (lidos como 52 e 52 em kg cheios) e um platô de 138,8 a 139,0 kg no alvo de 17.136,048 kg.
+
+Decisões (para revisão do usuário):
+- Janela: 3 posições antes e depois, na ordem do número (`business.charge_window_size` = 3). Cargas iguais são permitidas fora da janela.
+- Diferença mínima dentro da janela: 0,6 kg (`business.charge_window_min_gap_kg` = 0,6), valor que o usuário citou ao escolher a variação. Se não couber, desce em passos de 0,01 kg (bisseção) até caber, com aviso.
+- Furos fixos (menor carga positiva, maior carga preservada, assinatura) não são ajustados. Pares de fixos a menos de 0,6 kg na janela são mantidos e avisados (ex.: três furos de 10 kg numa planilha uniforme).
+- Zerados: escada cíclica a partir de 0,01 kg, com W+1 níveis separados pela diferença mínima; os níveis se repetem a cada 4 zerados (permitido pela regra).
+- Algoritmo: base proporcional (como antes) e depois ajuste local: o furo em violação vai ao valor mais próximo permitido e o total é compensado em outro furo livre, com a mesma variação em sentido oposto. Cada passo elimina uma violação sem criar outra, então termina.
+- Removidos: `business.charge_zero_fill_step_kg` (CLI) e `zeroChargeStepKg` (site). Com a escada pela janela, o passo de 0,001 kg não tinha efeito.
+
+Ordem aplicada (AGENTS.md): especificação (SPEC, PIPELINE, DATA_SCHEMA), configuração (`config.yaml` e os `config_PP*.yaml` com redistribuição ligada receberam `charge_window_size` e `charge_window_min_gap_kg`; `public/config.js` e `docs/config.js`), processamento (`public/charge.js`, `src/pfr/charge_distribution.py`, `src/pfr/processing.py`, `public/app.js`), testes e documentação.
+
+Resultados verificados:
+- REG RAMPA F3 (arquivo real, somente leitura), redistribuição padrão: 0 pares a até 3 posições com diferença menor que 0,6 kg; total 10.008,82 kg exato; 104 furos ajustados pela janela; CLI e site idênticos (valores e avisos).
+- REG RAMPA F3 com alvo de 17.136,048 kg: 0 violações; total exato; 17 furos ajustados; 22 furos acima de 130 kg. O alvo empurra a carga para o topo, e o padrão 139 / 138,4 / 137,8 / 137,2 se repete a cada 4 furos, dentro da regra.
+- Paridade CLI × site: `tests/test_charge_parity.py` compara 800 casos aleatórios (valores, avisos e recusas).
+- Robustez: 3.000 casos na CLI com vazios, zeros, empates e furo de assinatura, sem exceção inesperada.
+- Suítes: 10 suítes Node e 59 testes Python passam.
+
+Pendências abertas:
+(1) O alvo de 17.136,048 kg (`chargeTarget` / `charge_total_target_kg`) é 71% acima da soma da entrada (10.008,82 kg). Vale confirmar esse total antes de usar o bloco, porque é ele que empurra a carga para o topo.
+(2) Com o bloco de carga-alvo ligado, o site parte da `InputedCharge` original, mas a CLI redistribui os zerados antes de fechar o total (`src/pfr/processing.py`, `build_output_frame`). Os resultados podem diferir nesse modo; a paridade verificada cobre o modo padrão e a função de fechamento isolada.
+(3) Os `config_PP*.yaml` antigos não têm `charge_minimum_step_kg`; isso só afeta a CLI quando o fechamento de carga-alvo está ligado.
+(4) Se a diferença cair abaixo de 0,6 kg (plano com menor carga muito baixa), o resultado avisa com o valor usado.
+
 ## Atualização: cargas repetidas na redistribuição padrão (site)
 Motivo: no REG RAMPA F3 (320 furos, 1 zerado), a redistribuição padrão deixava 174 furos com carga repetida em 48 valores (ex.: 22,999977 kg em 11 furos), e o total saía com diferença de 0,000136 kg. Causa: a redistribuição só mexia nos zerados (todos iguais a 0,01 kg) e ajustava os demais na proporção, então cargas de origem iguais continuavam iguais; sem zerados, nada era ajustado. Com o bloco de carga-alvo, a repetição não aparecia.
 

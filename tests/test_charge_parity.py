@@ -1,7 +1,7 @@
 """Paridade entre a CLI Python (src/pfr/charge_distribution.py) e o site (public/charge.js).
 
-Gera casos aleatórios determinísticos, executa a referência JavaScript via Node e compara valor a valor.
-Se o Node não estiver instalado, o teste é pulado com aviso explícito (nunca falha por ausência de ferramenta).
+Gera casos aleatórios determinísticos, executa a referência JavaScript via Node e compara valor a valor, aviso a aviso.
+Se o Node não estiver instalado, o teste de paridade é pulado com aviso explícito (nunca falha por ausência de ferramenta).
 """
 
 import json
@@ -24,6 +24,9 @@ from pfr.charge_distribution import (  # noqa: E402
 
 NODE = shutil.which("node")
 SCRIPT = ROOT / "tests" / "parity" / "charge_parity_node.js"
+WINDOW_SIZE = 3
+WINDOW_GAP_KG = 0.6
+REDUCED_NOTE_MARKERS = ("ficou em", "faixa curta")
 
 
 def _random_values(rng: random.Random, count: int, with_none: bool) -> list:
@@ -58,8 +61,9 @@ def _zero_cases(seed: int, count: int) -> list:
             "mode": "zero",
             "values": values,
             "zeroMinimum": 0.01,
-            "zeroStep": 0.001,
             "fixedIndexes": fixed,
+            "windowSize": WINDOW_SIZE,
+            "windowMinGapKg": WINDOW_GAP_KG,
         })
     return cases
 
@@ -99,6 +103,8 @@ def _distribution_cases(seed: int, count: int) -> list:
             "maximumValue": maximum_value,
             "maximumIndexes": maximum_indexes,
             "fixedIndexes": fixed,
+            "windowSize": WINDOW_SIZE,
+            "windowMinGapKg": WINDOW_GAP_KG,
         })
     return cases
 
@@ -126,7 +132,8 @@ def _python_result(case: dict) -> dict:
                 case["values"],
                 enabled=True,
                 zero_minimum=case["zeroMinimum"],
-                zero_step_kg=case["zeroStep"],
+                window_size=case["windowSize"],
+                window_min_gap_kg=case["windowMinGapKg"],
                 fixed_indexes=case["fixedIndexes"],
                 notes=notes,
             )
@@ -135,6 +142,8 @@ def _python_result(case: dict) -> dict:
                 case["values"],
                 case["target"],
                 step_kg=case["stepKg"],
+                window_size=case["windowSize"],
+                window_min_gap_kg=case["windowMinGapKg"],
                 minimum_index=case["minimumIndex"],
                 minimum_value=case["minimumValue"],
                 maximum_index=case["maximumIndex"],
@@ -154,13 +163,17 @@ class ChargeParityTest(unittest.TestCase):
         reference = _run_reference(cases)
         self.assertEqual(len(reference), len(cases))
         mismatches = []
+        successes = 0
         for case, expected in zip(cases, reference):
             actual = _python_result(case)
             if expected["ok"] != actual["ok"]:
                 mismatches.append((case["mode"], expected, actual))
                 continue
-            if expected["ok"] and (expected["out"] != actual["out"] or expected["notes"] != actual["notes"]):
-                mismatches.append((case["mode"], expected["out"][:5], actual["out"][:5]))
+            if expected["ok"]:
+                successes += 1
+                if expected["out"] != actual["out"] or expected["notes"] != actual["notes"]:
+                    mismatches.append((case["mode"], expected["out"][:5], actual["out"][:5]))
+        self.assertGreater(successes, len(cases) // 2, "poucos casos válidos: o gerador de casos precisa de revisão")
         self.assertEqual(mismatches[:3], [], f"{len(mismatches)} divergências com o site")
 
     def test_zero_redistribution_matches_site(self):
@@ -171,26 +184,82 @@ class ChargeParityTest(unittest.TestCase):
 
 
 class ChargeInvariantTest(unittest.TestCase):
-    def test_zero_redistribution_keeps_total_and_distinct_loads(self):
+    """Regra da janela: nenhum furo a até WINDOW_SIZE posições fica a menos de WINDOW_GAP_KG (ou da diferença reduzida
+    e avisada). O total é exato e as cargas fixas (menor, maior preservada) não mudam."""
+
+    @staticmethod
+    def _window_pairs(values: list) -> list:
+        """Diferenças entre furos a até WINDOW_SIZE posições. Pares só de menor/maior carga (fixos) ficam de fora."""
+        positive = [v for v in values if v not in (None, 0)]
+        fixed_values = {min(positive), max(positive)} if positive else set()
+        pairs = []
+        for i in range(len(values)):
+            for j in range(i + 1, min(len(values) - 1, i + WINDOW_SIZE) + 1):
+                if values[i] is None or values[j] is None:
+                    continue
+                if values[i] in fixed_values and values[j] in fixed_values:
+                    continue
+                pairs.append(abs(values[i] - values[j]))
+        return pairs
+
+    def test_zero_redistribution_keeps_total_and_window(self):
         rng = random.Random(77)
+        checked = 0
         for _ in range(200):
             values = _random_values(rng, rng.randint(4, 90), with_none=True)
             if not any(v not in (None, 0.0) for v in values):
                 continue
+            notes: list = []
             try:
                 out = redistribute_zero_charges(
-                    values, enabled=True, zero_minimum=0.01, zero_step_kg=0.001, fixed_indexes=[], notes=[]
+                    values,
+                    enabled=True,
+                    zero_minimum=0.01,
+                    window_size=WINDOW_SIZE,
+                    window_min_gap_kg=WINDOW_GAP_KG,
+                    fixed_indexes=[],
+                    notes=notes,
                 )
             except ChargeDistributionError:
                 continue
+            checked += 1
             self.assertEqual(
                 round(sum(v for v in out if v is not None) * 1e6),
                 round(sum(v for v in values if v is not None) * 1e6),
             )
-            positives = [v for v in out if v is not None]
-            highest = max(positives)
-            non_maximum = [v for v in positives if v != highest]
-            self.assertEqual(len(non_maximum), len(set(non_maximum)), "carga repetida fora do máximo preservado")
+            reduced = any(marker in note for note in notes for marker in REDUCED_NOTE_MARKERS)
+            floor = 0.01 - 1e-9
+            for gap in self._window_pairs(out):
+                self.assertGreaterEqual(gap, floor, "furos vizinhos com diferença abaixo de 0,01 kg")
+                if not reduced:
+                    self.assertGreaterEqual(gap, WINDOW_GAP_KG - 1e-9, "furos vizinhos abaixo da diferença mínima sem aviso")
+        self.assertGreater(checked, 50)
+
+    def test_distribution_keeps_total_window_and_extremes(self):
+        values = [21.0, 0.0, 0.0, 0.0, 25.0, 30.0, 60.0, 21.0, 21.0, 21.0, 45.0, 60.0, 0.0, 18.0]
+        notes: list = []
+        out = distribute_charges(
+            values,
+            300.0,
+            step_kg=5.0,
+            window_size=WINDOW_SIZE,
+            window_min_gap_kg=WINDOW_GAP_KG,
+            minimum_index=1,
+            minimum_value=0.01,
+            maximum_index=6,
+            maximum_value=60.0,
+            maximum_indexes=[6, 11],
+            fixed_indexes=[],
+            notes=notes,
+        )
+        self.assertAlmostEqual(sum(out), 300.0, places=6)
+        self.assertEqual(out[6], 60.0)
+        self.assertEqual(out[11], 60.0)
+        self.assertEqual(out[1], 0.01)
+        reduced = any(marker in note for note in notes for marker in REDUCED_NOTE_MARKERS)
+        for gap in self._window_pairs(out):
+            if not reduced:
+                self.assertGreaterEqual(gap, WINDOW_GAP_KG - 1e-9)
 
 
 if __name__ == "__main__":

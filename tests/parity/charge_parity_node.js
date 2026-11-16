@@ -17,8 +17,9 @@ const results = cases.map(testCase => {
       const out = redistributeZeroCharges(testCase.values, {
         enabled: true,
         zeroChargeMinimum: testCase.zeroMinimum,
-        zeroChargeStepKg: testCase.zeroStep,
         fixedIndexes: testCase.fixedIndexes,
+        windowSize: testCase.windowSize,
+        windowMinGapKg: testCase.windowMinGapKg,
         notes
       });
       return { ok: true, out: out.map(value => (value === null ? null : value)), notes };
@@ -31,6 +32,8 @@ const results = cases.map(testCase => {
       maximumValue: testCase.maximumValue,
       maximumIndexes: testCase.maximumIndexes,
       fixedIndexes: testCase.fixedIndexes,
+      windowSize: testCase.windowSize,
+      windowMinGapKg: testCase.windowMinGapKg,
       notes
     });
     return { ok: true, out, notes };
